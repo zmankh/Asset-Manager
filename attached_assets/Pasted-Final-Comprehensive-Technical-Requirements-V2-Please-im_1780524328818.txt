@@ -1,0 +1,28 @@
+Final Comprehensive Technical Requirements (V2)
+Please implement a full-stack educational platform using Next.js (App Router), Tailwind CSS, and Firebase (Auth, Firestore, Hosting) with the following features:
+1. Gamification & Engagement:
+ Dynamic Leaderboards: Two distinct rankings:
+ Annual Ranking: Accumulated XP for the school year.
+ Weekly Ranking: Resets every Sunday.
+ Admin-Defined Titles: Allow Admin to set custom titles for leaderboard winners (e.g., "Grammar Master").
+ Gamification Elements: Add a "Streak Counter" to track consecutive days of activity.
+ Smart Feedback: When a student answers incorrectly, provide a "Why is this wrong?" hint (based on the Grammar Rule).
+2. Notification System:
+ Admin Control: Admin creates/edits/deletes notifications via the dashboard.
+ Display: Notifications appear as a Floating Card on the Student’s Main Dashboard.
+3. Advanced Quiz Engine (Question Bank):
+ Randomization: Admin defines the number of questions per quiz; the system pulls them randomly from the ⁠QuestionBank⁠ linked to a ⁠GrammarRule⁠.
+ Validation: Answers must be validated using the Answer Text (string matching) rather than index to ensure integrity.
+4. Admin Management & Analytics:
+ Full Control: Admin (⁠a.alkhdeirat@gmail.com⁠) manages users, site settings, Info Cards, and content.
+ Bulk Management: - Provide a "Download Excel Template" button.
+ Implement bulk upload parsing (using ⁠xlsx⁠ or ⁠papaparse⁠) to map questions to specific ⁠GrammarRule⁠ IDs.
+ Pedagogical Analytics: Create a dashboard with charts (using ⁠recharts⁠ or ⁠chart.js⁠) showing:
+ Global performance per rule.
+ Weakness Analysis: Automatically flag rules with high failure rates to aid curriculum development.
+ Capability to export reports as PDF/Excel.
+5. Technical Stack & Deployment:
+ Database: Firestore.
+ Hosting: Firebase Hosting (Next.js App Router compatible).
+ Security: Use ⁠firebase-admin⁠ for all server-side operations.
+ UI: Responsive design, Arabic-first interface, with clear data visualization for admin reports.
