@@ -1,5 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut, User as FirebaseUser } from "firebase/auth";
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  signOut as firebaseSignOut,
+  User as FirebaseUser
+} from "firebase/auth";
 import { auth } from "./firebase";
 
 interface AuthContextType {
@@ -7,6 +14,7 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, displayName: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -21,12 +29,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(currentUser);
       setLoading(false);
     });
-
     return () => unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
+  };
+
+  const signUp = async (email: string, password: string, displayName: string) => {
+    const credential = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(credential.user, { displayName });
   };
 
   const signOut = async () => {
@@ -36,7 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isAdmin = user?.email === "a.alkhdeirat@gmail.com";
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAdmin, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, loading, isAdmin, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

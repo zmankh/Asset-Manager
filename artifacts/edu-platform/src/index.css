@@ -67,108 +67,120 @@
 }
 
 :root {
-  --background: 140 30% 98%;
-  --foreground: 140 50% 10%;
-  --border: 140 20% 90%;
+  /* Warm cream background — friendly, not clinical */
+  --background: 45 60% 97%;
+  --foreground: 260 40% 15%;
+  --border: 260 20% 88%;
+  --input: 260 20% 88%;
+  --ring: 262 83% 58%;
+
   --card: 0 0% 100%;
-  --card-foreground: 140 50% 10%;
-  --card-border: 140 20% 90%;
-  --sidebar: 140 30% 96%;
-  --sidebar-foreground: 140 50% 15%;
-  --sidebar-border: 140 20% 90%;
-  --sidebar-primary: 140 50% 30%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 140 30% 90%;
-  --sidebar-accent-foreground: 140 50% 20%;
-  --sidebar-ring: 140 50% 30%;
+  --card-foreground: 260 40% 15%;
+  --card-border: 260 15% 90%;
+
   --popover: 0 0% 100%;
-  --popover-foreground: 140 50% 10%;
-  --popover-border: 140 20% 90%;
-  
-  /* Emerald Green / Islamic Green */
-  --primary: 158 64% 28%;
+  --popover-foreground: 260 40% 15%;
+  --popover-border: 260 15% 90%;
+
+  /* Vibrant purple — energetic, fun, modern */
+  --primary: 262 83% 58%;
   --primary-foreground: 0 0% 100%;
-  --primary-border: 158 64% 23%;
-  
-  /* Gold Accents */
-  --secondary: 45 93% 47%;
-  --secondary-foreground: 0 0% 10%;
-  --secondary-border: 45 93% 42%;
-  
-  --muted: 140 10% 92%;
-  --muted-foreground: 140 20% 40%;
-  --muted-border: 140 10% 88%;
-  
-  --accent: 140 40% 90%;
-  --accent-foreground: 140 60% 20%;
-  --accent-border: 140 40% 85%;
-  
+  --primary-border: 262 83% 50%;
+
+  /* Warm orange accent — playful, exciting */
+  --secondary: 28 95% 58%;
+  --secondary-foreground: 0 0% 100%;
+  --secondary-border: 28 95% 50%;
+
+  --muted: 260 20% 94%;
+  --muted-foreground: 260 20% 48%;
+  --muted-border: 260 15% 88%;
+
+  /* Sky blue accent — fresh, cheerful */
+  --accent: 199 90% 92%;
+  --accent-foreground: 199 80% 25%;
+  --accent-border: 199 70% 82%;
+
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
   --destructive-border: 0 84% 50%;
-  
-  --input: 140 20% 90%;
-  --ring: 158 64% 28%;
-  
-  --chart-1: 158 64% 28%; /* Emerald */
-  --chart-2: 45 93% 47%;  /* Gold */
-  --chart-3: 140 40% 50%; /* Lighter green */
-  --chart-4: 30 80% 55%;  /* Orange */
-  --chart-5: 200 80% 40%; /* Blue */
+
+  /* Sidebar: deep purple gradient feel */
+  --sidebar: 262 50% 96%;
+  --sidebar-foreground: 262 40% 20%;
+  --sidebar-border: 262 25% 88%;
+  --sidebar-primary: 262 83% 58%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-primary-border: 262 83% 50%;
+  --sidebar-accent: 262 40% 90%;
+  --sidebar-accent-foreground: 262 60% 25%;
+  --sidebar-accent-border: 262 35% 82%;
+  --sidebar-ring: 262 83% 58%;
+
+  /* Chart colors: vibrant for school kids */
+  --chart-1: 262 83% 58%;   /* Purple */
+  --chart-2: 28 95% 58%;    /* Orange */
+  --chart-3: 199 90% 48%;   /* Sky blue */
+  --chart-4: 142 72% 45%;   /* Green */
+  --chart-5: 340 80% 58%;   /* Pink */
 
   --app-font-sans: "Noto Kufi Arabic", "Tajawal", "Inter", sans-serif;
   --app-font-serif: Georgia, serif;
   --app-font-mono: Menlo, monospace;
-  --radius: 0.75rem; 
+  --radius: 0.875rem;
 }
 
 .dark {
-  --background: 140 30% 5%;
-  --foreground: 140 20% 90%;
-  --border: 140 20% 15%;
-  --card: 140 30% 7%;
-  --card-foreground: 140 20% 90%;
-  --card-border: 140 20% 15%;
-  --sidebar: 140 30% 6%;
-  --sidebar-foreground: 140 20% 85%;
-  --sidebar-border: 140 20% 15%;
-  --sidebar-primary: 158 64% 35%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 140 30% 12%;
-  --sidebar-accent-foreground: 140 20% 95%;
-  --sidebar-ring: 158 64% 35%;
-  --popover: 140 30% 7%;
-  --popover-foreground: 140 20% 90%;
-  --popover-border: 140 20% 15%;
-  
-  --primary: 158 64% 35%;
+  --background: 262 30% 8%;
+  --foreground: 260 20% 92%;
+  --border: 262 20% 18%;
+  --input: 262 20% 18%;
+  --ring: 262 83% 65%;
+
+  --card: 262 30% 10%;
+  --card-foreground: 260 20% 92%;
+  --card-border: 262 20% 18%;
+
+  --popover: 262 30% 10%;
+  --popover-foreground: 260 20% 92%;
+  --popover-border: 262 20% 18%;
+
+  --primary: 262 83% 65%;
   --primary-foreground: 0 0% 100%;
-  --primary-border: 158 64% 30%;
-  
-  --secondary: 45 93% 50%;
-  --secondary-foreground: 0 0% 10%;
-  --secondary-border: 45 93% 40%;
-  
-  --muted: 140 10% 15%;
-  --muted-foreground: 140 10% 60%;
-  --muted-border: 140 10% 20%;
-  
-  --accent: 140 30% 15%;
-  --accent-foreground: 140 20% 95%;
-  --accent-border: 140 30% 20%;
-  
-  --destructive: 0 62% 40%;
+  --primary-border: 262 83% 58%;
+
+  --secondary: 28 95% 62%;
+  --secondary-foreground: 0 0% 100%;
+  --secondary-border: 28 95% 55%;
+
+  --muted: 262 20% 15%;
+  --muted-foreground: 260 15% 58%;
+  --muted-border: 262 15% 20%;
+
+  --accent: 199 70% 18%;
+  --accent-foreground: 199 80% 75%;
+  --accent-border: 199 60% 25%;
+
+  --destructive: 0 62% 42%;
   --destructive-foreground: 0 0% 100%;
   --destructive-border: 0 62% 35%;
-  
-  --input: 140 20% 20%;
-  --ring: 158 64% 35%;
-  
-  --chart-1: 158 64% 45%; 
-  --chart-2: 45 93% 55%;  
-  --chart-3: 140 40% 60%; 
-  --chart-4: 30 80% 65%;  
-  --chart-5: 200 80% 60%; 
+
+  --sidebar: 262 35% 7%;
+  --sidebar-foreground: 262 20% 85%;
+  --sidebar-border: 262 20% 15%;
+  --sidebar-primary: 262 83% 65%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-primary-border: 262 83% 58%;
+  --sidebar-accent: 262 30% 14%;
+  --sidebar-accent-foreground: 262 20% 92%;
+  --sidebar-accent-border: 262 25% 20%;
+  --sidebar-ring: 262 83% 65%;
+
+  --chart-1: 262 83% 68%;
+  --chart-2: 28 95% 65%;
+  --chart-3: 199 80% 58%;
+  --chart-4: 142 65% 52%;
+  --chart-5: 340 75% 65%;
 }
 
 @layer base {
@@ -178,4 +190,13 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
+}
+
+/* Fun decorative background for auth pages */
+.auth-bg {
+  background:
+    radial-gradient(ellipse at 20% 50%, hsl(262 83% 58% / 0.12) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 20%, hsl(28 95% 58% / 0.10) 0%, transparent 50%),
+    radial-gradient(ellipse at 60% 80%, hsl(199 90% 48% / 0.10) 0%, transparent 50%),
+    hsl(45 60% 97%);
 }
