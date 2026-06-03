@@ -1,22 +1,39 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Educational Platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: users
+    description: User management
+  - name: grammar-rules
+    description: Grammar rules
+  - name: questions
+    description: Question bank
+  - name: quizzes
+    description: Quiz engine
+  - name: leaderboard
+    description: Leaderboard
+  - name: notifications
+    description: Notification system
+  - name: analytics
+    description: Admin analytics
+  - name: info-cards
+    description: Info cards
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +41,649 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all users (admin)
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create or update user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{userId}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    patch:
+      operationId: updateUser
+      tags: [users]
+      summary: Update user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Delete user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /users/{userId}/streak:
+    patch:
+      operationId: updateStreak
+      tags: [users]
+      summary: Update user streak
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StreakUpdate"
+      responses:
+        "200":
+          description: Updated streak
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /grammar-rules:
+    get:
+      operationId: listGrammarRules
+      tags: [grammar-rules]
+      summary: List grammar rules
+      responses:
+        "200":
+          description: List of grammar rules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GrammarRule"
+    post:
+      operationId: createGrammarRule
+      tags: [grammar-rules]
+      summary: Create grammar rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GrammarRuleInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GrammarRule"
+
+  /grammar-rules/{ruleId}:
+    get:
+      operationId: getGrammarRule
+      tags: [grammar-rules]
+      summary: Get grammar rule
+      parameters:
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Grammar rule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GrammarRule"
+    patch:
+      operationId: updateGrammarRule
+      tags: [grammar-rules]
+      summary: Update grammar rule
+      parameters:
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GrammarRuleUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GrammarRule"
+    delete:
+      operationId: deleteGrammarRule
+      tags: [grammar-rules]
+      summary: Delete grammar rule
+      parameters:
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /questions:
+    get:
+      operationId: listQuestions
+      tags: [questions]
+      summary: List questions (optionally filter by rule)
+      parameters:
+        - name: ruleId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of questions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Question"
+    post:
+      operationId: createQuestion
+      tags: [questions]
+      summary: Create question
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+
+  /questions/bulk:
+    post:
+      operationId: bulkCreateQuestions
+      tags: [questions]
+      summary: Bulk create questions from upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkQuestionsInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkResult"
+
+  /questions/{questionId}:
+    patch:
+      operationId: updateQuestion
+      tags: [questions]
+      summary: Update question
+      parameters:
+        - name: questionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+    delete:
+      operationId: deleteQuestion
+      tags: [questions]
+      summary: Delete question
+      parameters:
+        - name: questionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /quizzes/start:
+    post:
+      operationId: startQuiz
+      tags: [quizzes]
+      summary: Start a new quiz session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuizStartInput"
+      responses:
+        "201":
+          description: Quiz session started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizSession"
+
+  /quizzes/{sessionId}/answer:
+    post:
+      operationId: submitAnswer
+      tags: [quizzes]
+      summary: Submit an answer
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnswerInput"
+      responses:
+        "200":
+          description: Answer result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnswerResult"
+
+  /quizzes/{sessionId}/complete:
+    post:
+      operationId: completeQuiz
+      tags: [quizzes]
+      summary: Complete a quiz session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuizCompleteInput"
+      responses:
+        "200":
+          description: Quiz result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizResult"
+
+  /leaderboard/annual:
+    get:
+      operationId: getAnnualLeaderboard
+      tags: [leaderboard]
+      summary: Get annual leaderboard
+      responses:
+        "200":
+          description: Annual leaderboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Leaderboard"
+
+  /leaderboard/weekly:
+    get:
+      operationId: getWeeklyLeaderboard
+      tags: [leaderboard]
+      summary: Get weekly leaderboard
+      responses:
+        "200":
+          description: Weekly leaderboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Leaderboard"
+
+  /leaderboard/titles:
+    get:
+      operationId: listLeaderboardTitles
+      tags: [leaderboard]
+      summary: List admin-defined leaderboard titles
+      responses:
+        "200":
+          description: Titles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaderboardTitle"
+    post:
+      operationId: createLeaderboardTitle
+      tags: [leaderboard]
+      summary: Create leaderboard title
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeaderboardTitleInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaderboardTitle"
+
+  /leaderboard/titles/{titleId}:
+    patch:
+      operationId: updateLeaderboardTitle
+      tags: [leaderboard]
+      summary: Update leaderboard title
+      parameters:
+        - name: titleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeaderboardTitleUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaderboardTitle"
+    delete:
+      operationId: deleteLeaderboardTitle
+      tags: [leaderboard]
+      summary: Delete leaderboard title
+      parameters:
+        - name: titleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List notifications
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+    post:
+      operationId: createNotification
+      tags: [notifications]
+      summary: Create notification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+
+  /notifications/{notificationId}:
+    patch:
+      operationId: updateNotification
+      tags: [notifications]
+      summary: Update notification
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+    delete:
+      operationId: deleteNotification
+      tags: [notifications]
+      summary: Delete notification
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /analytics/overview:
+    get:
+      operationId: getAnalyticsOverview
+      tags: [analytics]
+      summary: Get analytics overview
+      responses:
+        "200":
+          description: Analytics overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsOverview"
+
+  /analytics/rules:
+    get:
+      operationId: getAnalyticsByRule
+      tags: [analytics]
+      summary: Get performance per grammar rule
+      responses:
+        "200":
+          description: Analytics by rule
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RuleAnalytics"
+
+  /analytics/weaknesses:
+    get:
+      operationId: getWeaknessAnalysis
+      tags: [analytics]
+      summary: Get rules with high failure rates
+      responses:
+        "200":
+          description: Weakness analysis
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RuleAnalytics"
+
+  /info-cards:
+    get:
+      operationId: listInfoCards
+      tags: [info-cards]
+      summary: List info cards
+      responses:
+        "200":
+          description: Info cards
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InfoCard"
+    post:
+      operationId: createInfoCard
+      tags: [info-cards]
+      summary: Create info card
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InfoCardInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InfoCard"
+
+  /info-cards/{cardId}:
+    patch:
+      operationId: updateInfoCard
+      tags: [info-cards]
+      summary: Update info card
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InfoCardUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InfoCard"
+    delete:
+      operationId: deleteInfoCard
+      tags: [info-cards]
+      summary: Delete info card
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +694,456 @@ components:
       required:
         - status
 
+    User:
+      type: object
+      required: [id, email, displayName, role, xpAnnual, xpWeekly, streak, createdAt]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        displayName:
+          type: string
+        role:
+          type: string
+          enum: [admin, student]
+        xpAnnual:
+          type: integer
+        xpWeekly:
+          type: integer
+        streak:
+          type: integer
+        title:
+          type: ["string", "null"]
+        photoURL:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    UserInput:
+      type: object
+      required: [email, displayName, role]
+      properties:
+        email:
+          type: string
+        displayName:
+          type: string
+        role:
+          type: string
+          enum: [admin, student]
+        photoURL:
+          type: ["string", "null"]
+
+    UserUpdate:
+      type: object
+      properties:
+        displayName:
+          type: string
+        role:
+          type: string
+          enum: [admin, student]
+        xpAnnual:
+          type: integer
+        xpWeekly:
+          type: integer
+        streak:
+          type: integer
+        title:
+          type: ["string", "null"]
+        photoURL:
+          type: ["string", "null"]
+
+    StreakUpdate:
+      type: object
+      required: [streak]
+      properties:
+        streak:
+          type: integer
+
+    GrammarRule:
+      type: object
+      required: [id, title, description, explanation, createdAt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        explanation:
+          type: string
+        questionCount:
+          type: integer
+        createdAt:
+          type: string
+
+    GrammarRuleInput:
+      type: object
+      required: [title, description, explanation]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        explanation:
+          type: string
+
+    GrammarRuleUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        explanation:
+          type: string
+
+    Question:
+      type: object
+      required: [id, ruleId, questionText, options, correctAnswer, createdAt]
+      properties:
+        id:
+          type: string
+        ruleId:
+          type: string
+        questionText:
+          type: string
+        options:
+          type: array
+          items:
+            type: string
+        correctAnswer:
+          type: string
+        hint:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    QuestionInput:
+      type: object
+      required: [ruleId, questionText, options, correctAnswer]
+      properties:
+        ruleId:
+          type: string
+        questionText:
+          type: string
+        options:
+          type: array
+          items:
+            type: string
+        correctAnswer:
+          type: string
+        hint:
+          type: string
+
+    QuestionUpdate:
+      type: object
+      properties:
+        questionText:
+          type: string
+        options:
+          type: array
+          items:
+            type: string
+        correctAnswer:
+          type: string
+        hint:
+          type: ["string", "null"]
+
+    BulkQuestionsInput:
+      type: object
+      required: [questions]
+      properties:
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuestionInput"
+
+    BulkResult:
+      type: object
+      required: [created, failed]
+      properties:
+        created:
+          type: integer
+        failed:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: string
+
+    QuizStartInput:
+      type: object
+      required: [userId, ruleId, questionCount]
+      properties:
+        userId:
+          type: string
+        ruleId:
+          type: string
+        questionCount:
+          type: integer
+
+    QuizSession:
+      type: object
+      required: [sessionId, userId, ruleId, questions, startedAt]
+      properties:
+        sessionId:
+          type: string
+        userId:
+          type: string
+        ruleId:
+          type: string
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Question"
+        startedAt:
+          type: string
+
+    AnswerInput:
+      type: object
+      required: [questionId, answerText, userId]
+      properties:
+        questionId:
+          type: string
+        answerText:
+          type: string
+        userId:
+          type: string
+
+    AnswerResult:
+      type: object
+      required: [correct, correctAnswer, xpAwarded]
+      properties:
+        correct:
+          type: boolean
+        correctAnswer:
+          type: string
+        hint:
+          type: ["string", "null"]
+        xpAwarded:
+          type: integer
+
+    QuizCompleteInput:
+      type: object
+      required: [userId, totalCorrect, totalQuestions]
+      properties:
+        userId:
+          type: string
+        totalCorrect:
+          type: integer
+        totalQuestions:
+          type: integer
+
+    QuizResult:
+      type: object
+      required: [score, xpEarned, passed]
+      properties:
+        score:
+          type: integer
+        xpEarned:
+          type: integer
+        passed:
+          type: boolean
+        newStreak:
+          type: integer
+
+    LeaderboardEntry:
+      type: object
+      required: [rank, userId, displayName, xp]
+      properties:
+        rank:
+          type: integer
+        userId:
+          type: string
+        displayName:
+          type: string
+        xp:
+          type: integer
+        title:
+          type: ["string", "null"]
+        photoURL:
+          type: ["string", "null"]
+        streak:
+          type: integer
+
+    Leaderboard:
+      type: object
+      required: [type, entries, updatedAt]
+      properties:
+        type:
+          type: string
+          enum: [annual, weekly]
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/LeaderboardEntry"
+        updatedAt:
+          type: string
+
+    LeaderboardTitle:
+      type: object
+      required: [id, title, minRank, maxRank]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        minRank:
+          type: integer
+        maxRank:
+          type: integer
+        description:
+          type: ["string", "null"]
+
+    LeaderboardTitleInput:
+      type: object
+      required: [title, minRank, maxRank]
+      properties:
+        title:
+          type: string
+        minRank:
+          type: integer
+        maxRank:
+          type: integer
+        description:
+          type: string
+
+    LeaderboardTitleUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        minRank:
+          type: integer
+        maxRank:
+          type: integer
+        description:
+          type: ["string", "null"]
+
+    Notification:
+      type: object
+      required: [id, title, message, active, createdAt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        active:
+          type: boolean
+        type:
+          type: string
+          enum: [info, warning, success, announcement]
+        createdAt:
+          type: string
+
+    NotificationInput:
+      type: object
+      required: [title, message]
+      properties:
+        title:
+          type: string
+        message:
+          type: string
+        type:
+          type: string
+          enum: [info, warning, success, announcement]
+        active:
+          type: boolean
+
+    NotificationUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        message:
+          type: string
+        type:
+          type: string
+          enum: [info, warning, success, announcement]
+        active:
+          type: boolean
+
+    AnalyticsOverview:
+      type: object
+      required: [totalStudents, totalQuizzes, totalQuestions, averageScore, activeThisWeek]
+      properties:
+        totalStudents:
+          type: integer
+        totalQuizzes:
+          type: integer
+        totalQuestions:
+          type: integer
+        averageScore:
+          type: number
+        activeThisWeek:
+          type: integer
+        topStreak:
+          type: integer
+
+    RuleAnalytics:
+      type: object
+      required: [ruleId, title, totalAttempts, correctAttempts, failureRate]
+      properties:
+        ruleId:
+          type: string
+        title:
+          type: string
+        totalAttempts:
+          type: integer
+        correctAttempts:
+          type: integer
+        failureRate:
+          type: number
+        flagged:
+          type: boolean
+
+    InfoCard:
+      type: object
+      required: [id, title, content, active, createdAt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+        icon:
+          type: ["string", "null"]
+        active:
+          type: boolean
+        order:
+          type: integer
+        createdAt:
+          type: string
+
+    InfoCardInput:
+      type: object
+      required: [title, content]
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        icon:
+          type: string
+        active:
+          type: boolean
+        order:
+          type: integer
+
+    InfoCardUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        icon:
+          type: ["string", "null"]
+        active:
+          type: boolean
+        order:
+          type: integer

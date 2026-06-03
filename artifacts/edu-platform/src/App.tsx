@@ -1,0 +1,83 @@
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import NotFound from "@/pages/not-found";
+import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { setAuthTokenGetter } from "@workspace/api-client-react";
+import { auth } from "@/lib/firebase";
+import { useEffect } from "react";
+
+// Set token getter for all API calls
+setAuthTokenGetter(async () => {
+  if (auth.currentUser) {
+    return await auth.currentUser.getIdToken();
+  }
+  return null;
+});
+
+const queryClient = new QueryClient();
+
+// Placeholder for now
+function AuthGuard({ children, adminOnly = false }: { children: React.ReactNode, adminOnly?: boolean }) {
+  const { user, loading, isAdmin } = useAuth();
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (!loading) {
+      if (!user) {
+        setLocation("/login");
+      } else if (adminOnly && !isAdmin) {
+        setLocation("/");
+      }
+    }
+  }, [user, loading, isAdmin, setLocation, adminOnly]);
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">جاري التحميل...</div>;
+  }
+
+  if (!user || (adminOnly && !isAdmin)) {
+    return null;
+  }
+
+  return <>{children}</>;
+}
+
+function Router() {
+  return (
+    <Switch>
+      <Route path="/login" component={() => <div>Login</div>} />
+      <Route path="/" component={() => <AuthGuard><div>Dashboard</div></AuthGuard>} />
+      <Route path="/leaderboard" component={() => <AuthGuard><div>Leaderboard</div></AuthGuard>} />
+      <Route path="/quiz" component={() => <AuthGuard><div>Quiz</div></AuthGuard>} />
+      
+      <Route path="/admin" component={() => <AuthGuard adminOnly><div>Admin</div></AuthGuard>} />
+      <Route path="/admin/users" component={() => <AuthGuard adminOnly><div>Admin Users</div></AuthGuard>} />
+      <Route path="/admin/rules" component={() => <AuthGuard adminOnly><div>Admin Rules</div></AuthGuard>} />
+      <Route path="/admin/questions" component={() => <AuthGuard adminOnly><div>Admin Questions</div></AuthGuard>} />
+      <Route path="/admin/notifications" component={() => <AuthGuard adminOnly><div>Admin Notifications</div></AuthGuard>} />
+      <Route path="/admin/leaderboard-titles" component={() => <AuthGuard adminOnly><div>Admin Titles</div></AuthGuard>} />
+      <Route path="/admin/info-cards" component={() => <AuthGuard adminOnly><div>Admin Info Cards</div></AuthGuard>} />
+      
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AuthProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+        </AuthProvider>
+        <Toaster />
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+}
+
+export default App;
