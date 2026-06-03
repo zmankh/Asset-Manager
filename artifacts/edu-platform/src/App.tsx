@@ -7,6 +7,19 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { auth } from "@/lib/firebase";
 import { useEffect } from "react";
+import { MainLayout } from "@/components/layout/main-layout";
+
+import Login from "@/pages/login";
+import Dashboard from "@/pages/dashboard";
+import Leaderboard from "@/pages/leaderboard";
+import Quiz from "@/pages/quiz";
+import AdminDashboard from "@/pages/admin/dashboard";
+import AdminUsers from "@/pages/admin/users";
+import AdminRules from "@/pages/admin/rules";
+import AdminQuestions from "@/pages/admin/questions";
+import AdminNotifications from "@/pages/admin/notifications";
+import AdminLeaderboardTitles from "@/pages/admin/leaderboard-titles";
+import AdminInfoCards from "@/pages/admin/info-cards";
 
 // Set token getter for all API calls
 setAuthTokenGetter(async () => {
@@ -18,7 +31,6 @@ setAuthTokenGetter(async () => {
 
 const queryClient = new QueryClient();
 
-// Placeholder for now
 function AuthGuard({ children, adminOnly = false }: { children: React.ReactNode, adminOnly?: boolean }) {
   const { user, loading, isAdmin } = useAuth();
   const [, setLocation] = useLocation();
@@ -41,24 +53,24 @@ function AuthGuard({ children, adminOnly = false }: { children: React.ReactNode,
     return null;
   }
 
-  return <>{children}</>;
+  return <MainLayout>{children}</MainLayout>;
 }
 
 function Router() {
   return (
     <Switch>
-      <Route path="/login" component={() => <div>Login</div>} />
-      <Route path="/" component={() => <AuthGuard><div>Dashboard</div></AuthGuard>} />
-      <Route path="/leaderboard" component={() => <AuthGuard><div>Leaderboard</div></AuthGuard>} />
-      <Route path="/quiz" component={() => <AuthGuard><div>Quiz</div></AuthGuard>} />
+      <Route path="/login" component={Login} />
+      <Route path="/" component={() => <AuthGuard><Dashboard /></AuthGuard>} />
+      <Route path="/leaderboard" component={() => <AuthGuard><Leaderboard /></AuthGuard>} />
+      <Route path="/quiz" component={() => <AuthGuard><Quiz /></AuthGuard>} />
       
-      <Route path="/admin" component={() => <AuthGuard adminOnly><div>Admin</div></AuthGuard>} />
-      <Route path="/admin/users" component={() => <AuthGuard adminOnly><div>Admin Users</div></AuthGuard>} />
-      <Route path="/admin/rules" component={() => <AuthGuard adminOnly><div>Admin Rules</div></AuthGuard>} />
-      <Route path="/admin/questions" component={() => <AuthGuard adminOnly><div>Admin Questions</div></AuthGuard>} />
-      <Route path="/admin/notifications" component={() => <AuthGuard adminOnly><div>Admin Notifications</div></AuthGuard>} />
-      <Route path="/admin/leaderboard-titles" component={() => <AuthGuard adminOnly><div>Admin Titles</div></AuthGuard>} />
-      <Route path="/admin/info-cards" component={() => <AuthGuard adminOnly><div>Admin Info Cards</div></AuthGuard>} />
+      <Route path="/admin" component={() => <AuthGuard adminOnly><AdminDashboard /></AuthGuard>} />
+      <Route path="/admin/users" component={() => <AuthGuard adminOnly><AdminUsers /></AuthGuard>} />
+      <Route path="/admin/rules" component={() => <AuthGuard adminOnly><AdminRules /></AuthGuard>} />
+      <Route path="/admin/questions" component={() => <AuthGuard adminOnly><AdminQuestions /></AuthGuard>} />
+      <Route path="/admin/notifications" component={() => <AuthGuard adminOnly><AdminNotifications /></AuthGuard>} />
+      <Route path="/admin/leaderboard-titles" component={() => <AuthGuard adminOnly><AdminLeaderboardTitles /></AuthGuard>} />
+      <Route path="/admin/info-cards" component={() => <AuthGuard adminOnly><AdminInfoCards /></AuthGuard>} />
       
       <Route component={NotFound} />
     </Switch>
