@@ -18,13 +18,15 @@ router.get("/", requireAdmin, async (req, res) => {
 router.post("/", requireAuth, async (req, res) => {
   try {
     const db = getFirestore();
-    const { email, displayName, role, photoURL } = req.body;
+    const { email, displayName, role, photoURL, schoolName, district } = req.body;
     const user = (req as any).user;
 
     const userData = {
       email,
       displayName,
       role: user.email === ADMIN_EMAIL ? (role || "student") : "student",
+      schoolName: schoolName || null,
+      district: district || null,
       xpAnnual: 0,
       xpWeekly: 0,
       streak: 0,
