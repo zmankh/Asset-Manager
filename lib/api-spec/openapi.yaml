@@ -2,31 +2,23 @@ openapi: 3.1.0
 info:
   title: Api
   version: 0.1.0
-  description: Educational Platform API
+  description: Educational Platform API - نحوي
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
-  - name: auth
-    description: Authentication
   - name: users
-    description: User management
   - name: grammar-rules
-    description: Grammar rules
   - name: questions
-    description: Question bank
   - name: quizzes
-    description: Quiz engine
+  - name: levels
+  - name: exams
+  - name: badges
   - name: leaderboard
-    description: Leaderboard
   - name: notifications
-    description: Notification system
   - name: analytics
-    description: Admin analytics
   - name: info-cards
-    description: Info cards
 
 paths:
   /healthz:
@@ -153,6 +145,48 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
+
+  /users/{userId}/progress:
+    get:
+      operationId: getUserProgress
+      tags: [users]
+      summary: Get a user's level progress
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Progress entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserProgress"
+
+  /users/{userId}/badges:
+    get:
+      operationId: getUserBadges
+      tags: [badges]
+      summary: Get a user's earned badges
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Badges
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Badge"
 
   /grammar-rules:
     get:
@@ -336,11 +370,174 @@ paths:
         "204":
           description: Deleted
 
+  /levels:
+    get:
+      operationId: listLevels
+      tags: [levels]
+      summary: List all levels, optionally filtered by category
+      parameters:
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [primary, middle, secondary]
+      responses:
+        "200":
+          description: Levels
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Level"
+    post:
+      operationId: createLevel
+      tags: [levels]
+      summary: Create a level (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LevelInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Level"
+
+  /levels/{levelId}:
+    get:
+      operationId: getLevel
+      tags: [levels]
+      summary: Get level
+      parameters:
+        - name: levelId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Level
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Level"
+    patch:
+      operationId: updateLevel
+      tags: [levels]
+      summary: Update level (admin)
+      parameters:
+        - name: levelId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LevelUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Level"
+    delete:
+      operationId: deleteLevel
+      tags: [levels]
+      summary: Delete level (admin)
+      parameters:
+        - name: levelId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /exams/start:
+    post:
+      operationId: startExam
+      tags: [exams]
+      summary: Start an exam for a level
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExamStartInput"
+      responses:
+        "201":
+          description: Exam session started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuizSession"
+
+  /exams/{sessionId}/answer:
+    post:
+      operationId: submitExamAnswer
+      tags: [exams]
+      summary: Submit an exam answer
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnswerInput"
+      responses:
+        "200":
+          description: Answer result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnswerResult"
+
+  /exams/{sessionId}/complete:
+    post:
+      operationId: completeExam
+      tags: [exams]
+      summary: Complete an exam session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExamCompleteInput"
+      responses:
+        "200":
+          description: Exam result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExamResult"
+
   /quizzes/start:
     post:
       operationId: startQuiz
       tags: [quizzes]
-      summary: Start a new quiz session
+      summary: Start a practice quiz session
       requestBody:
         required: true
         content:
@@ -359,7 +556,7 @@ paths:
     post:
       operationId: submitAnswer
       tags: [quizzes]
-      summary: Submit an answer
+      summary: Submit a practice quiz answer
       parameters:
         - name: sessionId
           in: path
@@ -384,7 +581,7 @@ paths:
     post:
       operationId: completeQuiz
       tags: [quizzes]
-      summary: Complete a quiz session
+      summary: Complete a practice quiz session
       parameters:
         - name: sessionId
           in: path
@@ -691,8 +888,11 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
+
+    GradeCategory:
+      type: string
+      enum: [primary, middle, secondary]
 
     User:
       type: object
@@ -707,12 +907,22 @@ components:
         role:
           type: string
           enum: [admin, student]
+        grade:
+          type: ["string", "null"]
+        gradeCategory:
+          $ref: "#/components/schemas/GradeCategory"
+        schoolName:
+          type: ["string", "null"]
+        district:
+          type: ["string", "null"]
         xpAnnual:
           type: integer
         xpWeekly:
           type: integer
         streak:
           type: integer
+        currentLevelId:
+          type: ["string", "null"]
         title:
           type: ["string", "null"]
         photoURL:
@@ -731,8 +941,16 @@ components:
         role:
           type: string
           enum: [admin, student]
+        grade:
+          type: string
+        gradeCategory:
+          $ref: "#/components/schemas/GradeCategory"
+        schoolName:
+          type: string
+        district:
+          type: string
         photoURL:
-          type: ["string", "null"]
+          type: string
 
     UserUpdate:
       type: object
@@ -742,12 +960,22 @@ components:
         role:
           type: string
           enum: [admin, student]
+        grade:
+          type: ["string", "null"]
+        gradeCategory:
+          $ref: "#/components/schemas/GradeCategory"
+        schoolName:
+          type: ["string", "null"]
+        district:
+          type: ["string", "null"]
         xpAnnual:
           type: integer
         xpWeekly:
           type: integer
         streak:
           type: integer
+        currentLevelId:
+          type: ["string", "null"]
         title:
           type: ["string", "null"]
         photoURL:
@@ -759,6 +987,120 @@ components:
       properties:
         streak:
           type: integer
+
+    UserProgress:
+      type: object
+      required: [id, userId, levelId, passed, score, completedAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        levelId:
+          type: string
+        levelTitle:
+          type: string
+        passed:
+          type: boolean
+        score:
+          type: integer
+        attempts:
+          type: integer
+        completedAt:
+          type: string
+
+    Badge:
+      type: object
+      required: [id, userId, ruleId, ruleTitle, earnedAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        ruleId:
+          type: string
+        ruleTitle:
+          type: string
+        levelId:
+          type: ["string", "null"]
+        levelTitle:
+          type: ["string", "null"]
+        earnedAt:
+          type: string
+
+    Level:
+      type: object
+      required: [id, title, order, categories, ruleId, passingScore, questionCount, active, createdAt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        order:
+          type: integer
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/GradeCategory"
+        ruleId:
+          type: string
+        ruleTitle:
+          type: ["string", "null"]
+        passingScore:
+          type: integer
+        questionCount:
+          type: integer
+        active:
+          type: boolean
+        createdAt:
+          type: string
+
+    LevelInput:
+      type: object
+      required: [title, order, categories, ruleId, passingScore, questionCount]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        order:
+          type: integer
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/GradeCategory"
+        ruleId:
+          type: string
+        passingScore:
+          type: integer
+        questionCount:
+          type: integer
+        active:
+          type: boolean
+
+    LevelUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        order:
+          type: integer
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/GradeCategory"
+        ruleId:
+          type: string
+        passingScore:
+          type: integer
+        questionCount:
+          type: integer
+        active:
+          type: boolean
 
     GrammarRule:
       type: object
@@ -872,6 +1214,47 @@ components:
           items:
             type: string
 
+    ExamStartInput:
+      type: object
+      required: [userId, levelId]
+      properties:
+        userId:
+          type: string
+        levelId:
+          type: string
+
+    ExamCompleteInput:
+      type: object
+      required: [userId, levelId, totalCorrect, totalQuestions]
+      properties:
+        userId:
+          type: string
+        levelId:
+          type: string
+        totalCorrect:
+          type: integer
+        totalQuestions:
+          type: integer
+
+    ExamResult:
+      type: object
+      required: [score, passed, xpEarned, newStreak, badgeEarned]
+      properties:
+        score:
+          type: integer
+        passed:
+          type: boolean
+        xpEarned:
+          type: integer
+        newStreak:
+          type: integer
+        badgeEarned:
+          type: boolean
+        badge:
+          $ref: "#/components/schemas/Badge"
+        nextLevelId:
+          type: ["string", "null"]
+
     QuizStartInput:
       type: object
       required: [userId, ruleId, questionCount]
@@ -885,14 +1268,16 @@ components:
 
     QuizSession:
       type: object
-      required: [sessionId, userId, ruleId, questions, startedAt]
+      required: [sessionId, userId, questions, startedAt]
       properties:
         sessionId:
           type: string
         userId:
           type: string
         ruleId:
-          type: string
+          type: ["string", "null"]
+        levelId:
+          type: ["string", "null"]
         questions:
           type: array
           items:
@@ -966,6 +1351,8 @@ components:
           type: ["string", "null"]
         streak:
           type: integer
+        grade:
+          type: ["string", "null"]
 
     Leaderboard:
       type: object

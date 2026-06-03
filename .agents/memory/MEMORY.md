@@ -1,0 +1,3 @@
+- [Platform architecture](platform-arch.md) — نحوي: React+Vite edu-platform + Express api-server + Firebase Auth/Firestore. Key quirks for queryKey and mutations.
+- [Signup Firestore fix](signup-fix.md) — Firestore setDoc after Firebase Auth must be try/catch non-fatal; onAuthStateChanged recreates missing profiles.
+- [Admin email](admin-email.md) — ADMIN_EMAIL = "a.alkhdeirat@gmail.com" hardcoded in both backend (firebase-admin.ts) and frontend (auth-context.tsx).

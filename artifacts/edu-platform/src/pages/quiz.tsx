@@ -12,7 +12,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
-import { AlertCircle, CheckCircle2, AlertTriangle, ArrowLeft, Trophy } from "lucide-react";
+import { AlertCircle, CheckCircle2, AlertTriangle, ArrowLeft, Trophy, Flame } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Link } from "wouter";
 
@@ -66,6 +66,7 @@ export default function Quiz() {
     
     try {
       const result = await submitAnswer.mutateAsync({
+        sessionId: session.sessionId,
         data: {
           userId: user.uid,
           questionId: currentQuestion.id,
@@ -92,6 +93,7 @@ export default function Quiz() {
       // Complete quiz
       try {
         const result = await completeQuiz.mutateAsync({
+          sessionId: session.sessionId,
           data: {
             userId: user!.uid,
             totalCorrect: correctAnswers + (answerResult?.correct ? 1 : 0),
@@ -303,5 +305,3 @@ export default function Quiz() {
   return null;
 }
 
-// Add this so it compiles if Flame is missing
-import { Flame } from "lucide-react";

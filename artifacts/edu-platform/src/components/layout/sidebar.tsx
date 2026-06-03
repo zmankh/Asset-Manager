@@ -12,6 +12,7 @@ import {
   CreditCard,
   LogOut,
   Zap,
+  Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -21,13 +22,15 @@ export function AppSidebar() {
 
   const studentLinks = [
     { href: "/", label: "الرئيسية", icon: LayoutDashboard },
-    { href: "/quiz", label: "اختبار جديد", icon: Zap },
+    { href: "/quiz", label: "تدرّب الآن", icon: Zap },
     { href: "/leaderboard", label: "لوحة المتصدرين", icon: Trophy },
+    { href: "/badges", label: "أوسمتي", icon: Medal },
   ];
 
   const adminLinks = [
     { href: "/admin", label: "لوحة التحكم", icon: LayoutDashboard },
     { href: "/admin/users", label: "إدارة المستخدمين", icon: Users },
+    { href: "/admin/levels", label: "المستويات", icon: Layers },
     { href: "/admin/rules", label: "القواعد النحوية", icon: BookOpen },
     { href: "/admin/questions", label: "بنك الأسئلة", icon: Settings },
     { href: "/admin/notifications", label: "الإشعارات", icon: Bell },

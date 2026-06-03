@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGetAnnualLeaderboard, useGetWeeklyLeaderboard } from "@workspace/api-client-react";
+import { useGetAnnualLeaderboard, useGetWeeklyLeaderboard, getGetAnnualLeaderboardQueryKey, getGetWeeklyLeaderboardQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Trophy, Medal, Award } from "lucide-react";
@@ -7,8 +7,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function Leaderboard() {
   const [period, setPeriod] = useState<"annual" | "weekly">("annual");
-  const { data: annualData, isLoading: loadingAnnual } = useGetAnnualLeaderboard({ query: { enabled: period === "annual" } });
-  const { data: weeklyData, isLoading: loadingWeekly } = useGetWeeklyLeaderboard({ query: { enabled: period === "weekly" } });
+  const { data: annualData, isLoading: loadingAnnual } = useGetAnnualLeaderboard({ query: { enabled: period === "annual", queryKey: getGetAnnualLeaderboardQueryKey() } });
+  const { data: weeklyData, isLoading: loadingWeekly } = useGetWeeklyLeaderboard({ query: { enabled: period === "weekly", queryKey: getGetWeeklyLeaderboardQueryKey() } });
 
   const data = period === "annual" ? annualData : weeklyData;
   const isLoading = period === "annual" ? loadingAnnual : loadingWeekly;

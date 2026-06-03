@@ -18,7 +18,7 @@ router.get("/", requireAdmin, async (req, res) => {
 router.post("/", requireAuth, async (req, res) => {
   try {
     const db = getFirestore();
-    const { email, displayName, role, photoURL, schoolName, district } = req.body;
+    const { email, displayName, role, photoURL, schoolName, district, grade, gradeCategory } = req.body;
     const user = (req as any).user;
 
     const userData = {
@@ -27,9 +27,12 @@ router.post("/", requireAuth, async (req, res) => {
       role: user.email === ADMIN_EMAIL ? (role || "student") : "student",
       schoolName: schoolName || null,
       district: district || null,
+      grade: grade || null,
+      gradeCategory: gradeCategory || null,
       xpAnnual: 0,
       xpWeekly: 0,
       streak: 0,
+      currentLevelId: null,
       title: null,
       photoURL: photoURL || null,
       createdAt: new Date().toISOString(),
@@ -39,6 +42,32 @@ router.post("/", requireAuth, async (req, res) => {
     res.status(201).json({ id: user.uid, ...userData });
   } catch (err) {
     res.status(500).json({ error: "Failed to create user" });
+  }
+});
+
+router.get("/:userId/progress", requireAuth, async (req, res) => {
+  try {
+    const db = getFirestore();
+    const snap = await db.collection("userProgress")
+      .where("userId", "==", req.params.userId)
+      .orderBy("completedAt", "desc")
+      .get();
+    res.json(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+  } catch (err) {
+    res.status(500).json({ error: "Failed to get user progress" });
+  }
+});
+
+router.get("/:userId/badges", requireAuth, async (req, res) => {
+  try {
+    const db = getFirestore();
+    const snap = await db.collection("badges")
+      .where("userId", "==", req.params.userId)
+      .orderBy("earnedAt", "desc")
+      .get();
+    res.json(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+  } catch (err) {
+    res.status(500).json({ error: "Failed to get badges" });
   }
 });
 
