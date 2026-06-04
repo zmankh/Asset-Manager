@@ -13,6 +13,7 @@ import {
   LogOut,
   Zap,
   Layers,
+  SlidersHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -36,6 +37,7 @@ export function AppSidebar() {
     { href: "/admin/notifications", label: "الإشعارات", icon: Bell },
     { href: "/admin/leaderboard-titles", label: "ألقاب المتصدرين", icon: Medal },
     { href: "/admin/info-cards", label: "بطاقات المعلومات", icon: CreditCard },
+    { href: "/admin/settings", label: "إعدادات الموقع", icon: SlidersHorizontal },
   ];
 
   const links = isAdmin ? adminLinks : studentLinks;

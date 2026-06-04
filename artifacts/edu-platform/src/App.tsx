@@ -21,6 +21,7 @@ import AdminNotifications from "@/pages/admin/notifications";
 import AdminLeaderboardTitles from "@/pages/admin/leaderboard-titles";
 import AdminInfoCards from "@/pages/admin/info-cards";
 import AdminLevels from "@/pages/admin/levels";
+import AdminSettings from "@/pages/admin/settings";
 import Badges from "@/pages/badges";
 import Exam from "@/pages/exam";
 
@@ -75,6 +76,7 @@ function Router() {
       <Route path="/admin/leaderboard-titles" component={() => <AuthGuard adminOnly><AdminLeaderboardTitles /></AuthGuard>} />
       <Route path="/admin/info-cards" component={() => <AuthGuard adminOnly><AdminInfoCards /></AuthGuard>} />
       <Route path="/admin/levels" component={() => <AuthGuard adminOnly><AdminLevels /></AuthGuard>} />
+      <Route path="/admin/settings" component={() => <AuthGuard adminOnly><AdminSettings /></AuthGuard>} />
       
       <Route path="/badges" component={() => <AuthGuard><Badges /></AuthGuard>} />
       <Route path="/exam/:levelId" component={() => <AuthGuard><Exam /></AuthGuard>} />

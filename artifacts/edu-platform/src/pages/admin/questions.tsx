@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import Papa from "papaparse";
+import * as XLSX from "xlsx";
 
 export default function AdminQuestions() {
   const [selectedRuleId, setSelectedRuleId] = useState<string>("all");
@@ -126,43 +127,178 @@ export default function AdminQuestions() {
   };
 
   const handleDownloadTemplate = () => {
-    const headers = "ruleId,questionText,option1,option2,option3,option4,correctAnswer,hint\n";
-    const sample = `${rules?.[0]?.id || "RULE_ID"},"ما هو إعراب الكلمة؟","مبتدأ","خبر","فاعل","مفعول به","مبتدأ","مرفوع وعلامة رفعه الضمة"\n`;
-    const blob = new Blob(["\uFEFF" + headers + sample], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", "questions_template.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const wb = XLSX.utils.book_new();
+
+    // ---- Sheet 1: قالب الأسئلة ----
+    // Row 1: Arabic column descriptions (guide row, highlighted)
+    const descRow = [
+      "معرّف القاعدة (انسخه من ورقة القواعد)",
+      "نص السؤال كاملاً",
+      "الخيار الأول",
+      "الخيار الثاني",
+      "الخيار الثالث (اختياري)",
+      "الخيار الرابع (اختياري)",
+      "الإجابة الصحيحة — يجب أن تطابق أحد الخيارات أعلاه",
+      "تلميح يظهر عند الإجابة الخاطئة (اختياري)",
+    ];
+
+    // Row 2: Technical headers (what the system reads during upload)
+    const headerRow = ["ruleId", "questionText", "option1", "option2", "option3", "option4", "correctAnswer", "hint"];
+
+    // Rows 3-4: Two complete Arabic examples
+    const firstRuleId = rules?.[0]?.id || "ضع_معرّف_القاعدة_هنا";
+    const secondRuleId = rules?.[1]?.id || rules?.[0]?.id || "ضع_معرّف_القاعدة_هنا";
+
+    const example1 = [
+      firstRuleId,
+      "ما إعراب كلمة (الطالبُ) في جملة: الطالبُ مجتهدٌ؟",
+      "مبتدأ مرفوع",
+      "خبر مرفوع",
+      "فاعل مرفوع",
+      "مفعول به منصوب",
+      "مبتدأ مرفوع",
+      "المبتدأ هو الاسم المرفوع الذي يُبنى عليه الكلام",
+    ];
+
+    const example2 = [
+      secondRuleId,
+      "أكمل الجملة بالكلمة الصحيحة: ذهبَ ______ إلى المدرسة",
+      "المعلمُ",
+      "المعلمَ",
+      "المعلمِ",
+      "للمعلمِ",
+      "المعلمُ",
+      "الفاعل يأتي مرفوعاً دائماً بعد الفعل",
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet([descRow, headerRow, example1, example2]);
+
+    // Column widths
+    ws["!cols"] = [
+      { wch: 40 }, { wch: 50 }, { wch: 22 }, { wch: 22 },
+      { wch: 22 }, { wch: 22 }, { wch: 25 }, { wch: 40 },
+    ];
+
+    // Style row 1 (description) — yellow background
+    const descCells = ["A1","B1","C1","D1","E1","F1","G1","H1"];
+    descCells.forEach((addr) => {
+      if (ws[addr]) {
+        ws[addr].s = {
+          fill: { fgColor: { rgb: "FFF3B0" } },
+          font: { bold: true, sz: 10 },
+          alignment: { horizontal: "right", vertical: "center", wrapText: true },
+        };
+      }
+    });
+
+    // Style row 2 (technical headers) — purple/primary background
+    const headerCells = ["A2","B2","C2","D2","E2","F2","G2","H2"];
+    headerCells.forEach((addr) => {
+      if (ws[addr]) {
+        ws[addr].s = {
+          fill: { fgColor: { rgb: "7C3AED" } },
+          font: { bold: true, color: { rgb: "FFFFFF" }, sz: 11 },
+          alignment: { horizontal: "center" },
+        };
+      }
+    });
+
+    XLSX.utils.book_append_sheet(wb, ws, "الأسئلة");
+
+    // ---- Sheet 2: القواعد المتاحة ----
+    const rulesData = [
+      ["معرّف القاعدة (ruleId)", "اسم القاعدة — انسخ المعرّف بالكامل"],
+      ...(rules || []).map((r) => [r.id, r.title]),
+    ];
+
+    if (!rules || rules.length === 0) {
+      rulesData.push(["لا توجد قواعد بعد", "أضف قواعد نحوية أولاً من صفحة القواعد النحوية"]);
+    }
+
+    const wsRules = XLSX.utils.aoa_to_sheet(rulesData);
+    wsRules["!cols"] = [{ wch: 36 }, { wch: 45 }];
+
+    // Header style for rules sheet
+    if (wsRules["A1"]) wsRules["A1"].s = { fill: { fgColor: { rgb: "7C3AED" } }, font: { bold: true, color: { rgb: "FFFFFF" } } };
+    if (wsRules["B1"]) wsRules["B1"].s = { fill: { fgColor: { rgb: "7C3AED" } }, font: { bold: true, color: { rgb: "FFFFFF" } } };
+
+    XLSX.utils.book_append_sheet(wb, wsRules, "القواعد المتاحة");
+
+    XLSX.writeFile(wb, "قالب_الأسئلة_نحوي.xlsx");
+  };
+
+  const parseAndUploadQuestions = async (rows: any[]) => {
+    // Filter rows that have required fields and skip description/empty rows
+    const questionsInput = rows
+      .filter((row: any) => row.ruleId && row.questionText && row.correctAnswer &&
+        // Skip rows where ruleId looks like a description (too long or contains spaces > 50 chars)
+        row.ruleId.length < 50 && row.questionText.length > 3)
+      .map((row: any) => ({
+        ruleId: row.ruleId,
+        questionText: row.questionText,
+        options: [row.option1, row.option2, row.option3, row.option4].filter(Boolean),
+        correctAnswer: row.correctAnswer,
+        hint: row.hint || undefined,
+      }));
+
+    if (questionsInput.length === 0) {
+      toast({ title: "لم يتم العثور على أسئلة صالحة في الملف", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const res = await bulkCreate.mutateAsync({ data: { questions: questionsInput } });
+      toast({ title: `✅ تم رفع ${res.created} سؤال بنجاح${res.failed > 0 ? `، وفشل ${res.failed}` : ""}` });
+      queryClient.invalidateQueries({ queryKey: getListQuestionsQueryKey() });
+    } catch (error) {
+      toast({ title: "حدث خطأ أثناء الرفع", variant: "destructive" });
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        const questionsInput = results.data.map((row: any) => ({
-          ruleId: row.ruleId,
-          questionText: row.questionText,
-          options: [row.option1, row.option2, row.option3, row.option4].filter(Boolean),
-          correctAnswer: row.correctAnswer,
-          hint: row.hint || undefined
-        }));
+    const isXlsx = file.name.endsWith(".xlsx") || file.name.endsWith(".xls");
 
+    if (isXlsx) {
+      // Parse Excel file — use technical header row (row 2, index 1) and skip description row
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
         try {
-          const res = await bulkCreate.mutateAsync({ data: { questions: questionsInput } });
-          toast({ title: `تم رفع ${res.created} سؤال بنجاح، وفشل ${res.failed}` });
-          queryClient.invalidateQueries({ queryKey: getListQuestionsQueryKey() });
-        } catch (error) {
-          toast({ title: "حدث خطأ أثناء الرفع", variant: "destructive" });
+          const data = evt.target?.result;
+          const wb = XLSX.read(data, { type: "array" });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          // Get all rows as arrays
+          const allRows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+          // Find the technical header row (the one containing "ruleId")
+          let headerRowIdx = allRows.findIndex((r) => r.includes("ruleId"));
+          if (headerRowIdx === -1) headerRowIdx = 0; // fallback to first row
+          const headers: string[] = allRows[headerRowIdx] as string[];
+          const dataRows = allRows.slice(headerRowIdx + 1).filter(row => row.some(c => c !== ""));
+          const mapped = dataRows.map((row: any[]) => {
+            const obj: Record<string, string> = {};
+            headers.forEach((h, i) => { obj[h] = row[i] ?? ""; });
+            return obj;
+          });
+          await parseAndUploadQuestions(mapped);
+        } catch {
+          toast({ title: "فشل قراءة ملف Excel", variant: "destructive" });
         }
         if (fileInputRef.current) fileInputRef.current.value = "";
-      }
-    });
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      // CSV parsing (original behavior)
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: async (results) => {
+          await parseAndUploadQuestions(results.data as any[]);
+          if (fileInputRef.current) fileInputRef.current.value = "";
+        },
+      });
+    }
   };
 
   return (
@@ -177,14 +313,14 @@ export default function AdminQuestions() {
           <div className="relative">
             <input 
               type="file" 
-              accept=".csv" 
+              accept=".csv,.xlsx,.xls" 
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
               ref={fileInputRef}
               onChange={handleFileUpload}
             />
             <Button variant="outline" className="gap-2">
               <Upload className="w-4 h-4" />
-              رفع أسئلة (CSV)
+              رفع أسئلة (Excel / CSV)
             </Button>
           </div>
           <Button onClick={handleOpenCreate} className="gap-2">

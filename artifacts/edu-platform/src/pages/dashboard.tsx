@@ -8,6 +8,7 @@ import {
   useGetAnnualLeaderboard, 
   useGetWeeklyLeaderboard, 
   useGetUserBadges, 
+  useListInfoCards,
   getGetUserQueryKey,
   getGetUserBadgesQueryKey,
   getListLevelsQueryKey,
@@ -42,6 +43,10 @@ export default function StudentDashboard() {
     query: { enabled: !!user?.uid, queryKey: getGetUserBadgesQueryKey(user?.uid || "") }
   });
   const latestBadges = useMemo(() => badges?.slice(0, 4) || [], [badges]);
+
+  // Info cards
+  const { data: infoCards } = useListInfoCards();
+  const activeInfoCards = useMemo(() => infoCards?.filter(c => c.active).sort((a, b) => (a.order||0) - (b.order||0)) || [], [infoCards]);
 
   // Current level logic
   const gradeCategory = (userData?.gradeCategory || null) as GradeCategory | null;
@@ -266,6 +271,25 @@ export default function StudentDashboard() {
           </Card>
         </div>
       </div>
+
+      {/* Info Cards */}
+      {activeInfoCards.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {activeInfoCards.map(card => (
+            <Card key={card.id} className="bg-primary/5 border-primary/20 hover:shadow-md transition-shadow">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Info className="w-4 h-4 text-primary shrink-0" />
+                  {card.title}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground leading-relaxed">{card.content}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Bottom Action */}
       <div className="flex justify-center pt-4 border-t border-border/50">

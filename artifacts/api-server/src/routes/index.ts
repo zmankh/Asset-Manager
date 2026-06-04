@@ -13,6 +13,7 @@ import notificationsRouter from "./notifications.js";
 import analyticsRouter from "./analytics.js";
 import infoCardsRouter from "./info-cards.js";
 import { seedDefaultLevels } from "./levels.js";
+import settingsRouter from "./settings.js";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use("/leaderboard", leaderboardRouter);
 router.use("/notifications", notificationsRouter);
 router.use("/analytics", analyticsRouter);
 router.use("/info-cards", infoCardsRouter);
+router.use("/settings", settingsRouter);
 
 export default router;
