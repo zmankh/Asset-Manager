@@ -4,6 +4,8 @@ import { AppSidebar, SidebarNavContent } from "./sidebar";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu, BookOpen } from "lucide-react";
+import { NotificationBell } from "@/components/notification-bell";
+import { useAuth } from "@/lib/auth-context";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -11,6 +13,7 @@ interface MainLayoutProps {
 
 export function MainLayout({ children }: MainLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { isAdmin } = useAuth();
 
   return (
     <div className="flex min-h-screen bg-background text-foreground dir-rtl">
@@ -38,7 +41,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             </div>
             <span className="text-lg font-black text-primary">نحوي</span>
           </Link>
-          <div className="w-9" />
+          {!isAdmin ? <NotificationBell /> : <div className="w-9" />}
         </div>
 
         <div className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">

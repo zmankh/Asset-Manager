@@ -16,6 +16,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { NotificationBell } from "@/components/notification-bell";
 
 const studentLinks = [
   { href: "/", label: "الرئيسية", icon: LayoutDashboard },
@@ -97,6 +98,12 @@ export function SidebarNavContent({ onNavigate }: SidebarNavContentProps) {
 
       {/* User + Sign out */}
       <div className="p-3 border-t border-sidebar-border space-y-2">
+        {!isAdmin && (
+          <div className="flex items-center justify-between px-3 py-1">
+            <span className="text-xs text-muted-foreground font-semibold">إشعاراتي</span>
+            <NotificationBell />
+          </div>
+        )}
         <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-sidebar-accent">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-secondary to-secondary/70 flex items-center justify-center text-white text-xs font-black shadow-sm shrink-0">
             {initials}

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { getFirestore } from "../lib/firebase-admin.js";
 import { requireAuth } from "../middlewares/auth.js";
+import { createUserNotification } from "./user-notifications.js";
 
 const router = Router();
 
@@ -178,6 +179,33 @@ router.post("/:sessionId/complete", requireAuth, async (req, res) => {
         const badgeRef = await db.collection("badges").add(badgeData);
         badge = { id: badgeRef.id, ...badgeData };
         badgeEarned = true;
+      }
+    }
+
+    // Auto-create user notifications
+    if (userId) {
+      if (badgeEarned && badge) {
+        await createUserNotification(
+          userId,
+          "🏅 وسام جديد!",
+          `لقد حصلت على وسام "${ruleTitle}" بعد إجابة 100% صحيحة!`,
+          "badge"
+        );
+      }
+      if (passed) {
+        await createUserNotification(
+          userId,
+          "🎉 اجتزت المستوى!",
+          `أحسنت! اجتزت "${level.title}" بنتيجة ${score}%. ${nextLevelId ? "المستوى التالي جاهز لك." : ""}`,
+          "level"
+        );
+      } else {
+        await createUserNotification(
+          userId,
+          "📊 نتيجة الامتحان",
+          `حصلت على ${score}% في "${level.title}". ${score >= 50 ? "استمر بالتدريب لتحسين نتيجتك!" : "راجع القاعدة وحاول مجدداً."}`,
+          "exam"
+        );
       }
     }
 
