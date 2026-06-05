@@ -4,7 +4,7 @@ import { requireAuth, requireAdmin } from "../middlewares/auth.js";
 
 const router = Router();
 
-router.get("/", requireAuth, async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const db = getFirestore();
     const snap = await db.collection("infoCards").orderBy("order").get();

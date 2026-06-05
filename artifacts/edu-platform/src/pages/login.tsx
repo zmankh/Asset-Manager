@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth, GradeCategory } from "@/lib/auth-context";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles, BookOpen, Star, Zap, ChevronDown } from "lucide-react";
+import { Sparkles, BookOpen, Star, Zap, ChevronDown, Info } from "lucide-react";
 
 type Mode = "login" | "signup";
 
@@ -27,6 +27,14 @@ const CATEGORY_LABELS: Record<GradeCategory, string> = {
   secondary: "ثانوي",
 };
 
+interface InfoCard {
+  id: string;
+  title: string;
+  content: string;
+  active: boolean;
+  order?: number;
+}
+
 export default function Login() {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
@@ -37,11 +45,23 @@ export default function Login() {
   const [grade, setGrade] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [infoCards, setInfoCards] = useState<InfoCard[]>([]);
   const { signIn, signUp } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const selectedGradeInfo = GRADES.find((g) => g.value === grade);
+
+  useEffect(() => {
+    const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+    fetch(`${base}/api/info-cards`)
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: InfoCard[]) => {
+        const active = data.filter((c) => c.active).sort((a, b) => (a.order || 0) - (b.order || 0));
+        setInfoCards(active);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,7 +113,7 @@ export default function Login() {
   };
 
   return (
-    <div className="auth-bg min-h-screen flex flex-col items-center justify-center p-4">
+    <div className="auth-bg min-h-screen flex flex-col items-center justify-center p-4 py-10">
       <div className="fixed top-10 right-10 w-24 h-24 rounded-full bg-primary/10 blur-2xl pointer-events-none" />
       <div className="fixed bottom-20 left-10 w-32 h-32 rounded-full bg-secondary/10 blur-2xl pointer-events-none" />
       <div className="fixed top-1/2 left-1/4 w-20 h-20 rounded-full bg-accent/30 blur-xl pointer-events-none" />
@@ -126,12 +146,11 @@ export default function Login() {
         </div>
 
         {/* Form */}
-        <div className="bg-white rounded-3xl shadow-xl shadow-primary/10 border border-border p-7">
+        <div className="bg-white rounded-3xl shadow-xl shadow-primary/10 border border-border p-6 sm:p-7">
           <form onSubmit={handleSubmit} className="space-y-4">
 
             {mode === "signup" && (
               <>
-                {/* Name */}
                 <div className="space-y-1.5">
                   <Label htmlFor="displayName" className="font-bold text-sm">الاسم الكامل</Label>
                   <Input id="displayName" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
@@ -139,7 +158,6 @@ export default function Login() {
                     className="rounded-xl h-11 bg-muted/30" />
                 </div>
 
-                {/* Grade selector */}
                 <div className="space-y-1.5">
                   <Label htmlFor="grade" className="font-bold text-sm">الصف الدراسي</Label>
                   <div className="relative">
@@ -172,7 +190,6 @@ export default function Login() {
                   )}
                 </div>
 
-                {/* School */}
                 <div className="space-y-1.5">
                   <Label htmlFor="schoolName" className="font-bold text-sm">اسم المدرسة</Label>
                   <Input id="schoolName" type="text" value={schoolName} onChange={(e) => setSchoolName(e.target.value)}
@@ -180,7 +197,6 @@ export default function Login() {
                     className="rounded-xl h-11 bg-muted/30" />
                 </div>
 
-                {/* District */}
                 <div className="space-y-1.5">
                   <Label htmlFor="district" className="font-bold text-sm">المديرية</Label>
                   <Input id="district" type="text" value={district} onChange={(e) => setDistrict(e.target.value)}
@@ -190,7 +206,6 @@ export default function Login() {
               </>
             )}
 
-            {/* Email */}
             <div className="space-y-1.5">
               <Label htmlFor="email" className="font-bold text-sm">البريد الإلكتروني</Label>
               <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
@@ -198,7 +213,6 @@ export default function Login() {
                 className="rounded-xl h-11 bg-muted/30" />
             </div>
 
-            {/* Password */}
             <div className="space-y-1.5">
               <Label htmlFor="password" className="font-bold text-sm">كلمة المرور</Label>
               <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
@@ -242,6 +256,32 @@ export default function Login() {
 
         <p className="text-center text-xs text-muted-foreground mt-5">تعلّم النحو بطريقة ممتعة وتنافسية</p>
       </div>
+
+      {/* Info Cards Section */}
+      {infoCards.length > 0 && (
+        <div className="w-full max-w-3xl mt-10 px-2">
+          <h2 className="text-center text-base font-bold text-muted-foreground mb-5 flex items-center justify-center gap-2">
+            <Info className="w-4 h-4" />
+            معلومات مفيدة
+          </h2>
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {infoCards.map((card) => (
+              <div
+                key={card.id}
+                className="bg-white/80 backdrop-blur rounded-2xl border border-primary/15 shadow-sm p-5 hover:shadow-md hover:-translate-y-0.5 transition-all"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-7 h-7 bg-primary/10 rounded-lg flex items-center justify-center shrink-0">
+                    <Info className="w-3.5 h-3.5 text-primary" />
+                  </div>
+                  <h3 className="font-bold text-sm text-foreground">{card.title}</h3>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">{card.content}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -17,28 +17,32 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export function AppSidebar() {
+const studentLinks = [
+  { href: "/", label: "الرئيسية", icon: LayoutDashboard },
+  { href: "/quiz", label: "تدرّب الآن", icon: Zap },
+  { href: "/leaderboard", label: "لوحة المتصدرين", icon: Trophy },
+  { href: "/badges", label: "أوسمتي", icon: Medal },
+];
+
+const adminLinks = [
+  { href: "/admin", label: "لوحة التحكم", icon: LayoutDashboard },
+  { href: "/admin/users", label: "إدارة المستخدمين", icon: Users },
+  { href: "/admin/levels", label: "المستويات", icon: Layers },
+  { href: "/admin/rules", label: "القواعد النحوية", icon: BookOpen },
+  { href: "/admin/questions", label: "بنك الأسئلة", icon: Settings },
+  { href: "/admin/notifications", label: "الإشعارات", icon: Bell },
+  { href: "/admin/leaderboard-titles", label: "ألقاب المتصدرين", icon: Medal },
+  { href: "/admin/info-cards", label: "بطاقات المعلومات", icon: CreditCard },
+  { href: "/admin/settings", label: "إعدادات الموقع", icon: SlidersHorizontal },
+];
+
+interface SidebarNavContentProps {
+  onNavigate?: () => void;
+}
+
+export function SidebarNavContent({ onNavigate }: SidebarNavContentProps) {
   const [location] = useLocation();
   const { isAdmin, signOut, user } = useAuth();
-
-  const studentLinks = [
-    { href: "/", label: "الرئيسية", icon: LayoutDashboard },
-    { href: "/quiz", label: "تدرّب الآن", icon: Zap },
-    { href: "/leaderboard", label: "لوحة المتصدرين", icon: Trophy },
-    { href: "/badges", label: "أوسمتي", icon: Medal },
-  ];
-
-  const adminLinks = [
-    { href: "/admin", label: "لوحة التحكم", icon: LayoutDashboard },
-    { href: "/admin/users", label: "إدارة المستخدمين", icon: Users },
-    { href: "/admin/levels", label: "المستويات", icon: Layers },
-    { href: "/admin/rules", label: "القواعد النحوية", icon: BookOpen },
-    { href: "/admin/questions", label: "بنك الأسئلة", icon: Settings },
-    { href: "/admin/notifications", label: "الإشعارات", icon: Bell },
-    { href: "/admin/leaderboard-titles", label: "ألقاب المتصدرين", icon: Medal },
-    { href: "/admin/info-cards", label: "بطاقات المعلومات", icon: CreditCard },
-    { href: "/admin/settings", label: "إعدادات الموقع", icon: SlidersHorizontal },
-  ];
 
   const links = isAdmin ? adminLinks : studentLinks;
 
@@ -47,7 +51,7 @@ export function AppSidebar() {
     : user?.email?.[0]?.toUpperCase() ?? "؟";
 
   return (
-    <div className="w-64 border-l bg-sidebar flex flex-col h-full sticky top-0 right-0">
+    <div className="flex flex-col h-full">
       {/* Brand */}
       <div className="p-5 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
@@ -75,6 +79,7 @@ export function AppSidebar() {
             <Link
               key={link.href}
               href={link.href}
+              onClick={onNavigate}
               className={cn(
                 "flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150",
                 isActive
@@ -114,6 +119,14 @@ export function AppSidebar() {
           تسجيل الخروج
         </Button>
       </div>
+    </div>
+  );
+}
+
+export function AppSidebar() {
+  return (
+    <div className="w-64 border-l bg-sidebar flex flex-col h-full sticky top-0 right-0">
+      <SidebarNavContent />
     </div>
   );
 }
