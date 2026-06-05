@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Trash2, Edit, Plus, ArrowUp, ArrowDown } from "lucide-react";
+import { Trash2, Edit, Plus, ArrowUp, ArrowDown, BookOpen } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
@@ -41,7 +41,7 @@ export default function AdminLevels() {
     description: string;
     order: number;
     categories: GradeCategory[];
-    ruleId: string;
+    ruleIds: string[];
     passingScore: number;
     questionCount: number;
     active: boolean;
@@ -50,7 +50,7 @@ export default function AdminLevels() {
     description: "", 
     order: 1, 
     categories: [], 
-    ruleId: "", 
+    ruleIds: [], 
     passingScore: 70, 
     questionCount: 10,
     active: true
@@ -64,6 +64,12 @@ export default function AdminLevels() {
 
   const sortedLevels = [...(levels || [])].sort((a, b) => a.order - b.order);
 
+  const getLevelRuleIds = (level: any): string[] => {
+    if (Array.isArray(level.ruleIds) && level.ruleIds.length > 0) return level.ruleIds;
+    if (level.ruleId) return [level.ruleId];
+    return [];
+  };
+
   const handleOpenEdit = (level: any) => {
     setEditingId(level.id);
     setFormData({ 
@@ -71,7 +77,7 @@ export default function AdminLevels() {
       description: level.description || "", 
       order: level.order,
       categories: level.categories || [],
-      ruleId: level.ruleId,
+      ruleIds: getLevelRuleIds(level),
       passingScore: level.passingScore,
       questionCount: level.questionCount,
       active: level.active
@@ -86,7 +92,7 @@ export default function AdminLevels() {
       description: "", 
       order: (levels?.length || 0) + 1, 
       categories: [], 
-      ruleId: "", 
+      ruleIds: [], 
       passingScore: 70, 
       questionCount: 10,
       active: true
@@ -103,14 +109,23 @@ export default function AdminLevels() {
     }));
   };
 
+  const handleRuleToggle = (ruleId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      ruleIds: prev.ruleIds.includes(ruleId)
+        ? prev.ruleIds.filter(id => id !== ruleId)
+        : [...prev.ruleIds, ruleId]
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.categories.length === 0) {
       toast({ title: "يجب اختيار فئة واحدة على الأقل", variant: "destructive" });
       return;
     }
-    if (!formData.ruleId) {
-      toast({ title: "يجب اختيار القاعدة النحوية", variant: "destructive" });
+    if (formData.ruleIds.length === 0) {
+      toast({ title: "يجب اختيار قاعدة نحوية واحدة على الأقل", variant: "destructive" });
       return;
     }
 
@@ -195,7 +210,7 @@ export default function AdminLevels() {
                 <TableHead className="text-right w-16">الترتيب</TableHead>
                 <TableHead className="text-right">العنوان</TableHead>
                 <TableHead className="text-right">الفئات</TableHead>
-                <TableHead className="text-right">القاعدة</TableHead>
+                <TableHead className="text-right">القواعد</TableHead>
                 <TableHead className="text-right">التفاصيل</TableHead>
                 <TableHead className="text-right">الحالة</TableHead>
                 <TableHead className="text-right w-32">إجراءات</TableHead>
@@ -211,67 +226,88 @@ export default function AdminLevels() {
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">لا توجد مستويات</TableCell>
                 </TableRow>
               ) : (
-                sortedLevels.map((level, index) => (
-                  <TableRow key={level.id}>
-                    <TableCell>
-                      <div className="flex flex-col items-center justify-center gap-1">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-6 w-6" 
-                          disabled={index === 0}
-                          onClick={() => handleMove(level, 'up')}
-                        >
-                          <ArrowUp className="h-3 w-3" />
-                        </Button>
-                        <span className="font-bold text-sm">{level.order}</span>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-6 w-6" 
-                          disabled={index === sortedLevels.length - 1}
-                          onClick={() => handleMove(level, 'down')}
-                        >
-                          <ArrowDown className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-medium">{level.title}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1 flex-wrap">
-                        {level.categories.map((cat: string) => (
-                          <Badge key={cat} variant="secondary" className="text-xs">
-                            {categoryMap[cat as GradeCategory] || cat}
-                          </Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell className="truncate max-w-[150px]">
-                      {rules?.find(r => r.id === level.ruleId)?.title || level.ruleTitle || "غير معروف"}
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm text-muted-foreground">
-                        <div>{level.questionCount} أسئلة</div>
-                        <div>نجاح: {level.passingScore}%</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={level.active ? "default" : "outline"} className={level.active ? "bg-green-500 hover:bg-green-600" : ""}>
-                        {level.active ? "نشط" : "غير نشط"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(level)}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" onClick={() => handleDelete(level.id)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                sortedLevels.map((level, index) => {
+                  const levelRuleIds = getLevelRuleIds(level);
+                  const levelRules = (level as any).rules || levelRuleIds.map((id: string) => ({
+                    id,
+                    title: rules?.find(r => r.id === id)?.title || id
+                  }));
+                  return (
+                    <TableRow key={level.id}>
+                      <TableCell>
+                        <div className="flex flex-col items-center justify-center gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6" 
+                            disabled={index === 0}
+                            onClick={() => handleMove(level, 'up')}
+                          >
+                            <ArrowUp className="h-3 w-3" />
+                          </Button>
+                          <span className="font-bold text-sm">{level.order}</span>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6" 
+                            disabled={index === sortedLevels.length - 1}
+                            onClick={() => handleMove(level, 'down')}
+                          >
+                            <ArrowDown className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-medium">{level.title}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-1 flex-wrap">
+                          {level.categories.map((cat: string) => (
+                            <Badge key={cat} variant="secondary" className="text-xs">
+                              {categoryMap[cat as GradeCategory] || cat}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5 text-sm">
+                          <BookOpen className="w-4 h-4 text-muted-foreground shrink-0" />
+                          <span className="font-medium">{levelRuleIds.length}</span>
+                          <span className="text-muted-foreground">
+                            {levelRuleIds.length === 1 ? "قاعدة" : "قواعد"}
+                          </span>
+                        </div>
+                        <div className="mt-1 space-y-0.5">
+                          {levelRules.slice(0, 2).map((r: any) => (
+                            <div key={r.id} className="text-xs text-muted-foreground truncate max-w-[150px]">• {r.title}</div>
+                          ))}
+                          {levelRules.length > 2 && (
+                            <div className="text-xs text-muted-foreground">+{levelRules.length - 2} أخرى</div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm text-muted-foreground">
+                          <div>{level.questionCount} أسئلة / امتحان</div>
+                          <div>نجاح: {level.passingScore}%</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={level.active ? "default" : "outline"} className={level.active ? "bg-green-500 hover:bg-green-600" : ""}>
+                          {level.active ? "نشط" : "غير نشط"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(level)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" onClick={() => handleDelete(level.id)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -279,7 +315,7 @@ export default function AdminLevels() {
       </Card>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-[600px] dir-rtl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[620px] dir-rtl max-h-[90vh] overflow-y-auto">
           <form onSubmit={handleSubmit}>
             <DialogHeader>
               <DialogTitle>{editingId ? 'تعديل المستوى' : 'إضافة مستوى جديد'}</DialogTitle>
@@ -319,13 +355,35 @@ export default function AdminLevels() {
               </div>
 
               <div className="space-y-2">
-                <Label>القاعدة النحوية</Label>
-                <Select value={formData.ruleId} onValueChange={(v) => setFormData({...formData, ruleId: v})}>
-                  <SelectTrigger><SelectValue placeholder="اختر القاعدة" /></SelectTrigger>
-                  <SelectContent>
-                    {rules?.map(r => <SelectItem key={r.id} value={r.id}>{r.title}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Label>
+                  القواعد النحوية
+                  <span className="text-muted-foreground text-xs mr-2">
+                    (سيكون لكل قاعدة امتحان مستقل)
+                  </span>
+                </Label>
+                {(!rules || rules.length === 0) ? (
+                  <p className="text-sm text-muted-foreground">لا توجد قواعد — أضف قواعد نحوية أولاً</p>
+                ) : (
+                  <div className="border rounded-lg p-3 max-h-52 overflow-y-auto space-y-2">
+                    {rules.map(r => (
+                      <div key={r.id} className="flex items-center space-x-2 space-x-reverse py-1">
+                        <Checkbox 
+                          id={`rule-${r.id}`} 
+                          checked={formData.ruleIds.includes(r.id)}
+                          onCheckedChange={() => handleRuleToggle(r.id)}
+                        />
+                        <label htmlFor={`rule-${r.id}`} className="text-sm leading-none cursor-pointer flex-1">
+                          {r.title}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {formData.ruleIds.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    تم اختيار {formData.ruleIds.length} {formData.ruleIds.length === 1 ? "قاعدة" : "قواعد"} ← {formData.ruleIds.length} امتحان في هذا المستوى
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -334,7 +392,7 @@ export default function AdminLevels() {
                   <Input type="number" required min={1} max={100} value={formData.passingScore} onChange={e => setFormData({...formData, passingScore: parseInt(e.target.value) || 70})} />
                 </div>
                 <div className="space-y-2">
-                  <Label>عدد الأسئلة</Label>
+                  <Label>عدد الأسئلة (لكل امتحان)</Label>
                   <Input type="number" required min={1} value={formData.questionCount} onChange={e => setFormData({...formData, questionCount: parseInt(e.target.value) || 10})} />
                 </div>
               </div>

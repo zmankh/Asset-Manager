@@ -12,15 +12,16 @@ import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { AlertCircle, CheckCircle2, AlertTriangle, ArrowLeft, Trophy, Medal, Star } from "lucide-react";
+import { AlertCircle, CheckCircle2, AlertTriangle, ArrowLeft, Trophy, Medal, Star, BookOpen, ChevronLeft } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Link, useParams } from "wouter";
+import { Link, useParams, useLocation } from "wouter";
+import { Badge } from "@/components/ui/badge";
 
 export default function Exam() {
-  const { levelId } = useParams<{ levelId: string }>();
+  const { levelId, ruleId } = useParams<{ levelId: string; ruleId?: string }>();
+  const [, navigate] = useLocation();
   const { user } = useAuth();
   
-  // Wait for levelId and user
   const { data: level, isLoading: loadingLevel } = useGetLevel(levelId || "", {
     query: { enabled: !!levelId, queryKey: getGetLevelQueryKey(levelId || "") }
   });
@@ -45,7 +46,8 @@ export default function Exam() {
       const result = await startExam.mutateAsync({
         data: {
           userId: user.uid,
-          levelId: levelId
+          levelId: levelId,
+          ruleId: ruleId || undefined,
         }
       });
       setSession(result);
@@ -91,14 +93,15 @@ export default function Exam() {
       setSelectedAnswer("");
       setAnswerResult(null);
     } else {
-      // Complete exam
       try {
+        const finalCorrect = correctAnswers + (answerResult?.correct ? 1 : 0);
         const result = await completeExam.mutateAsync({
           sessionId: session.sessionId,
           data: {
             userId: user!.uid,
             levelId: levelId || "",
-            totalCorrect: correctAnswers + (answerResult?.correct ? 1 : 0),
+            ruleId: session.ruleId || ruleId || "",
+            totalCorrect: finalCorrect,
             totalQuestions: session.questions.length
           }
         });
@@ -118,24 +121,119 @@ export default function Exam() {
     return <div className="text-center py-12">لم يتم العثور على المستوى</div>;
   }
 
+  // ── Level Overview (no specific ruleId in URL) ──────────────────────────────
+  if (!ruleId) {
+    const levelRules: { id: string; title: string }[] = (level as any).rules || [];
+    return (
+      <div className="max-w-2xl mx-auto mt-8 space-y-4">
+        <Link href="/">
+          <Button variant="ghost" className="gap-2 mb-2">
+            <ChevronLeft className="w-4 h-4" />
+            العودة للرئيسية
+          </Button>
+        </Link>
+
+        <Card>
+          <CardHeader className="pb-4">
+            <div className="flex items-start gap-3">
+              <div className="bg-primary/10 p-3 rounded-xl">
+                <BookOpen className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-2xl">{level.title}</CardTitle>
+                {(level as any).description && (
+                  <p className="text-muted-foreground mt-1">{(level as any).description}</p>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="bg-muted p-3 rounded-lg flex justify-between">
+                <span className="text-muted-foreground">نسبة النجاح</span>
+                <span className="font-bold">{(level as any).passingScore}%</span>
+              </div>
+              <div className="bg-muted p-3 rounded-lg flex justify-between">
+                <span className="text-muted-foreground">أسئلة / امتحان</span>
+                <span className="font-bold">{(level as any).questionCount}</span>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <p className="text-sm font-medium mb-3 text-muted-foreground">
+                امتحانات هذا المستوى ({levelRules.length})
+              </p>
+              <div className="space-y-2">
+                {levelRules.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">لا توجد قواعد مضافة لهذا المستوى</p>
+                ) : levelRules.map((rule, idx) => (
+                  <div
+                    key={rule.id}
+                    className="flex items-center justify-between p-4 border rounded-xl hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
+                        {idx + 1}
+                      </div>
+                      <div>
+                        <p className="font-medium">{rule.title}</p>
+                        <p className="text-xs text-muted-foreground">{(level as any).questionCount} سؤال</p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => navigate(`/exam/${levelId}/${rule.id}`)}
+                    >
+                      ابدأ الامتحان
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // ── Get the current rule title from the level ──────────────────────────────
+  const levelRules: { id: string; title: string }[] = (level as any).rules || [];
+  const currentRule = levelRules.find(r => r.id === ruleId);
+  const ruleTitle = currentRule?.title || (level as any).ruleTitle || "";
+
+  // ── Exam Setup ──────────────────────────────────────────────────────────────
   if (examState === "setup") {
     return (
-      <div className="max-w-2xl mx-auto mt-8">
+      <div className="max-w-2xl mx-auto mt-8 space-y-4">
+        <Button variant="ghost" className="gap-2" onClick={() => navigate(`/exam/${levelId}`)}>
+          <ChevronLeft className="w-4 h-4" />
+          {level.title}
+        </Button>
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl">امتحان المستوى: {level.title}</CardTitle>
+            <CardTitle className="text-2xl">امتحان: {ruleTitle}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <p className="text-muted-foreground text-lg">
-              هذا الامتحان سيختبر مدى فهمك لقاعدة "{level.ruleTitle || level.title}".
-            </p>
+          <CardContent className="space-y-4">
+            {levelRules.length > 1 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {levelRules.map((r, idx) => (
+                  <Badge
+                    key={r.id}
+                    variant={r.id === ruleId ? "default" : "secondary"}
+                    className="text-xs"
+                  >
+                    {idx + 1}. {r.title}
+                  </Badge>
+                ))}
+              </div>
+            )}
             <div className="bg-muted p-4 rounded-xl flex justify-between items-center">
               <span>نسبة النجاح المطلوبة:</span>
-              <span className="font-bold text-lg">{level.passingScore}%</span>
+              <span className="font-bold text-lg">{(level as any).passingScore}%</span>
             </div>
             <div className="bg-muted p-4 rounded-xl flex justify-between items-center">
               <span>عدد الأسئلة:</span>
-              <span className="font-bold text-lg">{level.questionCount} أسئلة</span>
+              <span className="font-bold text-lg">{(level as any).questionCount} أسئلة</span>
             </div>
           </CardContent>
           <CardFooter>
@@ -153,9 +251,10 @@ export default function Exam() {
     );
   }
 
+  // ── Playing ─────────────────────────────────────────────────────────────────
   if (examState === "playing" && session) {
     const currentQuestion = session.questions[currentQuestionIndex];
-    const progress = ((currentQuestionIndex) / session.questions.length) * 100;
+    const progress = (currentQuestionIndex / session.questions.length) * 100;
 
     return (
       <div className="max-w-3xl mx-auto space-y-6 mt-4">
@@ -249,8 +348,10 @@ export default function Exam() {
     );
   }
 
+  // ── Summary ─────────────────────────────────────────────────────────────────
   if (examState === "summary" && examResult) {
     const isPassed = examResult.passed;
+    const allDone = examResult.allRulesPassed;
 
     return (
       <div className="max-w-lg mx-auto mt-12 space-y-6">
@@ -259,12 +360,15 @@ export default function Exam() {
             {isPassed ? <Trophy className="w-16 h-16" /> : <AlertTriangle className="w-16 h-16" />}
           </div>
           <CardContent className="pt-8 pb-8 space-y-6">
-            <h2 className="text-3xl font-bold">{isPassed ? 'نجاح!' : 'لم تجتز الامتحان'}</h2>
+            <div>
+              <h2 className="text-3xl font-bold">{isPassed ? 'نجاح!' : 'لم تجتز الامتحان'}</h2>
+              {ruleTitle && <p className="text-muted-foreground mt-1">{ruleTitle}</p>}
+            </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-muted p-4 rounded-xl">
                 <p className="text-muted-foreground text-sm">النتيجة</p>
-                <p className="text-2xl font-bold">{Math.round(examResult.score * 100)}%</p>
+                <p className="text-2xl font-bold">{Math.round(examResult.score)}%</p>
               </div>
               <div className="bg-muted p-4 rounded-xl">
                 <p className="text-muted-foreground text-sm">النقاط المكتسبة</p>
@@ -279,11 +383,17 @@ export default function Exam() {
                 <p className="text-sm">لقد أتقنت هذه القاعدة النحوية بجدارة.</p>
               </div>
             )}
-            
-            {isPassed && examResult.nextLevelId && (
+
+            {isPassed && allDone && examResult.nextLevelId && (
               <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-lg flex items-center justify-center gap-3">
                 <Star className="w-6 h-6 text-green-600" />
-                <span className="font-bold text-lg">ترقيت للمستوى التالي!</span>
+                <span className="font-bold text-lg">أتممت المستوى! ترقيت للمستوى التالي.</span>
+              </div>
+            )}
+
+            {isPassed && !allDone && (
+              <div className="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-lg text-sm">
+                أحسنت! أكمل باقي امتحانات المستوى للترقي.
               </div>
             )}
           </CardContent>
@@ -293,8 +403,13 @@ export default function Exam() {
                 إعادة الامتحان
               </Button>
             )}
+            {isPassed && levelRules.length > 1 && (
+              <Button variant="outline" className="flex-1" onClick={() => navigate(`/exam/${levelId}`)}>
+                باقي الامتحانات
+              </Button>
+            )}
             <Link href="/" className="flex-1">
-              <Button className="w-full">العودة للرئيسية</Button>
+              <Button className="w-full">الرئيسية</Button>
             </Link>
           </CardFooter>
         </Card>

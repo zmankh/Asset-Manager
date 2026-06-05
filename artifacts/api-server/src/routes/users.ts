@@ -1,20 +1,65 @@
 import { Router } from "express";
-import { getFirestore, ADMIN_EMAIL } from "../lib/firebase-admin.js";
+import { getFirestore, getFirebaseAdmin, ADMIN_EMAIL } from "../lib/firebase-admin.js";
 import { requireAuth, requireAdmin } from "../middlewares/auth.js";
 
 const router = Router();
 
-// List all users (admin)
+// List all users (admin) — syncs from Firebase Auth to Firestore
 router.get("/", requireAdmin, async (req, res) => {
   try {
+    const adminInstance = getFirebaseAdmin();
     const db = getFirestore();
-    // No orderBy to avoid composite index requirement — sort in JS
+
+    // Pull ALL Firebase Auth users (handles pagination)
+    let allAuthUsers: any[] = [];
+    let nextPageToken: string | undefined;
+    do {
+      const result = await adminInstance.auth().listUsers(1000, nextPageToken);
+      allAuthUsers = allAuthUsers.concat(result.users);
+      nextPageToken = result.pageToken;
+    } while (nextPageToken);
+
+    // Load existing Firestore docs
     const snap = await db.collection("users").get();
-    const users = snap.docs
-      .map((d) => ({ id: d.id, ...d.data() as any }))
-      .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+    const firestoreMap = new Map(snap.docs.map((d) => [d.id, { id: d.id, ...d.data() as any }]));
+
+    // Merge: auto-create Firestore doc for any Auth user missing one
+    const batch = db.batch();
+    let needsCommit = false;
+
+    const users = allAuthUsers.map((authUser) => {
+      const existing = firestoreMap.get(authUser.uid) as any;
+      if (existing) return existing;
+
+      const profile = {
+        email: authUser.email || null,
+        displayName: authUser.displayName || authUser.email || null,
+        role: authUser.email === ADMIN_EMAIL ? "admin" : "student",
+        schoolName: null,
+        district: null,
+        grade: null,
+        gradeCategory: null,
+        xpAnnual: 0,
+        xpWeekly: 0,
+        streak: 0,
+        currentLevelId: null,
+        title: null,
+        photoURL: authUser.photoURL || null,
+        createdAt: authUser.metadata?.creationTime || new Date().toISOString(),
+      };
+      batch.set(db.collection("users").doc(authUser.uid), profile);
+      needsCommit = true;
+      return { id: authUser.uid, ...profile };
+    });
+
+    if (needsCommit) await batch.commit();
+
+    // Sort by createdAt descending
+    users.sort((a: any, b: any) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+
     res.json(users);
   } catch (err) {
+    console.error("List users error:", err);
     res.status(500).json({ error: "Failed to list users" });
   }
 });
@@ -54,7 +99,6 @@ router.post("/", requireAuth, async (req, res) => {
 router.get("/:userId/progress", requireAuth, async (req, res) => {
   try {
     const db = getFirestore();
-    // No orderBy — sort in JS to avoid composite index
     const snap = await db.collection("userProgress")
       .where("userId", "==", req.params.userId)
       .get();
@@ -71,7 +115,6 @@ router.get("/:userId/progress", requireAuth, async (req, res) => {
 router.get("/:userId/badges", requireAuth, async (req, res) => {
   try {
     const db = getFirestore();
-    // No orderBy — sort in JS to avoid composite index
     const snap = await db.collection("badges")
       .where("userId", "==", req.params.userId)
       .get();
@@ -96,7 +139,6 @@ router.get("/:userId", requireAuth, async (req, res) => {
       return res.json({ id: docSnap.id, ...docSnap.data() });
     }
 
-    // Auto-create profile when the user fetches their own missing document
     if (reqUser.uid === req.params.userId) {
       const autoProfile = {
         email: reqUser.email || null,

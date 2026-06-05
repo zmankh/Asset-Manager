@@ -14,11 +14,17 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a;
 }
 
-// Start an exam for a level
+function normalizeRuleIds(data: any): string[] {
+  if (Array.isArray(data.ruleIds) && data.ruleIds.length > 0) return data.ruleIds;
+  if (data.ruleId) return [data.ruleId];
+  return [];
+}
+
+// Start an exam for a specific rule within a level
 router.post("/start", requireAuth, async (req, res) => {
   try {
     const db = getFirestore();
-    const { userId, levelId } = req.body;
+    const { userId, levelId, ruleId } = req.body;
 
     const levelDoc = await db.collection("levels").doc(levelId).get();
     if (!levelDoc.exists) return res.status(404).json({ error: "Level not found" });
@@ -26,14 +32,20 @@ router.post("/start", requireAuth, async (req, res) => {
 
     if (!level.active) return res.status(400).json({ error: "Level is not active" });
 
-    const snap = await db.collection("questions").where("ruleId", "==", level.ruleId).get();
-    if (snap.empty) return res.status(400).json({ error: "No questions available for this level" });
+    // Determine which ruleId to use
+    const levelRuleIds = normalizeRuleIds(level);
+    if (levelRuleIds.length === 0) return res.status(400).json({ error: "No rules configured for this level" });
+
+    const targetRuleId = ruleId && levelRuleIds.includes(ruleId) ? ruleId : levelRuleIds[0];
+
+    const snap = await db.collection("questions").where("ruleId", "==", targetRuleId).get();
+    if (snap.empty) return res.status(400).json({ error: "No questions available for this rule" });
 
     const allQ = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
-    const selected = shuffleArray(allQ).slice(0, level.questionCount);
+    const selected = shuffleArray(allQ).slice(0, level.questionCount || 10);
 
     const sessionData = {
-      userId, levelId, ruleId: level.ruleId,
+      userId, levelId, ruleId: targetRuleId,
       questions: selected,
       type: "exam",
       startedAt: new Date().toISOString(),
@@ -47,13 +59,14 @@ router.post("/start", requireAuth, async (req, res) => {
       await db.collection("users").doc(userId).update({ lastActiveAt: new Date().toISOString() }).catch(() => {});
     }
 
-    res.status(201).json({ sessionId: ref.id, userId, ruleId: level.ruleId, levelId, questions: selected, startedAt: sessionData.startedAt });
+    res.status(201).json({ sessionId: ref.id, userId, ruleId: targetRuleId, levelId, questions: selected, startedAt: sessionData.startedAt });
   } catch (err) {
+    console.error("Start exam error:", err);
     res.status(500).json({ error: "Failed to start exam" });
   }
 });
 
-// Submit answer (same as quiz answer)
+// Submit answer
 router.post("/:sessionId/answer", requireAuth, async (req, res) => {
   try {
     const db = getFirestore();
@@ -92,17 +105,19 @@ router.post("/:sessionId/answer", requireAuth, async (req, res) => {
   }
 });
 
-// Complete exam — update progress, award badge if perfect
+// Complete exam — track per-rule progress, advance level only when ALL rules passed
 router.post("/:sessionId/complete", requireAuth, async (req, res) => {
   try {
     const db = getFirestore();
-    const { userId, levelId, totalCorrect, totalQuestions } = req.body;
+    const { userId, levelId, ruleId, totalCorrect, totalQuestions } = req.body;
 
     const score = Math.round((totalCorrect / totalQuestions) * 100);
 
     const levelDoc = await db.collection("levels").doc(levelId).get();
     if (!levelDoc.exists) return res.status(404).json({ error: "Level not found" });
     const level = levelDoc.data() as any;
+    const levelRuleIds = normalizeRuleIds(level);
+
     const passed = score >= level.passingScore;
     const xpEarned = totalCorrect * 10 + (passed ? 50 : 0);
 
@@ -111,25 +126,32 @@ router.post("/:sessionId/complete", requireAuth, async (req, res) => {
       completed: true, completedAt: new Date().toISOString(), score, xpEarned, passed,
     });
 
-    // Update or create progress record
+    // Get rule title
+    const effectiveRuleId = ruleId || level.ruleId || levelRuleIds[0];
+    let ruleTitle = "قاعدة";
+    if (effectiveRuleId) {
+      const ruleDoc = await db.collection("grammarRules").doc(effectiveRuleId).get();
+      if (ruleDoc.exists) ruleTitle = (ruleDoc.data() as any).title;
+    }
+
+    // Update or create per-rule progress record
     const progressQuery = await db.collection("userProgress")
       .where("userId", "==", userId)
       .where("levelId", "==", levelId)
-      .limit(1).get();
+      .get();
 
-    const ruleDoc = await db.collection("grammarRules").doc(level.ruleId).get();
-    const ruleTitle = ruleDoc.exists ? (ruleDoc.data() as any).title : "قاعدة";
+    const existingForRule = progressQuery.docs.find(d => d.data().ruleId === effectiveRuleId);
 
-    if (progressQuery.empty) {
+    if (!existingForRule) {
       await db.collection("userProgress").add({
         userId, levelId, levelTitle: level.title,
+        ruleId: effectiveRuleId, ruleTitle,
         passed, score, attempts: 1,
         completedAt: new Date().toISOString(),
       });
     } else {
-      const progressRef = progressQuery.docs[0].ref;
-      const existing = progressQuery.docs[0].data() as any;
-      await progressRef.update({
+      const existing = existingForRule.data() as any;
+      await existingForRule.ref.update({
         passed: existing.passed || passed,
         score: Math.max(existing.score || 0, score),
         attempts: (existing.attempts || 0) + 1,
@@ -137,7 +159,23 @@ router.post("/:sessionId/complete", requireAuth, async (req, res) => {
       });
     }
 
-    // Award XP to user
+    // Check if ALL rules in the level are now passed
+    const allProgressSnap = await db.collection("userProgress")
+      .where("userId", "==", userId)
+      .where("levelId", "==", levelId)
+      .get();
+
+    const passedRuleIds = new Set(
+      allProgressSnap.docs
+        .filter(d => d.data().passed === true)
+        .map(d => d.data().ruleId)
+    );
+    // Include the current rule if just passed
+    if (passed) passedRuleIds.add(effectiveRuleId);
+
+    const allRulesPassed = levelRuleIds.length > 0 && levelRuleIds.every(rid => passedRuleIds.has(rid));
+
+    // Award XP and advance level only when all rules passed
     let newStreak = 0;
     let nextLevelId: string | null = null;
     if (userId) {
@@ -151,14 +189,17 @@ router.post("/:sessionId/complete", requireAuth, async (req, res) => {
           xpWeekly: (u.xpWeekly || 0) + xpEarned,
           streak: newStreak,
         };
-        if (passed) {
-          // Advance to next level
+        if (allRulesPassed) {
+          // Find next level — sort in JS to avoid composite index
           const nextSnap = await db.collection("levels")
-            .where("order", ">", level.order)
             .where("active", "==", true)
-            .orderBy("order").limit(1).get();
-          if (!nextSnap.empty) {
-            nextLevelId = nextSnap.docs[0].id;
+            .get();
+          const sorted = nextSnap.docs
+            .map(d => ({ id: d.id, ...d.data() as any }))
+            .filter(l => l.order > level.order)
+            .sort((a, b) => a.order - b.order);
+          if (sorted.length > 0) {
+            nextLevelId = sorted[0].id;
             update.currentLevelId = nextLevelId;
           }
         }
@@ -166,19 +207,18 @@ router.post("/:sessionId/complete", requireAuth, async (req, res) => {
       }
     }
 
-    // Award badge if perfect score (100%)
+    // Award badge on 100% for this specific rule
     let badgeEarned = false;
     let badge = null;
-    if (score === 100 && userId) {
-      // Check if badge already exists for this rule
+    if (score === 100 && userId && effectiveRuleId) {
       const badgeSnap = await db.collection("badges")
         .where("userId", "==", userId)
-        .where("ruleId", "==", level.ruleId)
+        .where("ruleId", "==", effectiveRuleId)
         .limit(1).get();
 
       if (badgeSnap.empty) {
         const badgeData = {
-          userId, ruleId: level.ruleId, ruleTitle,
+          userId, ruleId: effectiveRuleId, ruleTitle,
           levelId, levelTitle: level.title,
           earnedAt: new Date().toISOString(),
         };
@@ -188,7 +228,7 @@ router.post("/:sessionId/complete", requireAuth, async (req, res) => {
       }
     }
 
-    // Auto-create user notifications
+    // Auto-create notifications
     if (userId) {
       if (badgeEarned && badge) {
         await createUserNotification(
@@ -198,25 +238,33 @@ router.post("/:sessionId/complete", requireAuth, async (req, res) => {
           "badge"
         );
       }
-      if (passed) {
+      if (passed && allRulesPassed) {
         await createUserNotification(
           userId,
           "🎉 اجتزت المستوى!",
-          `أحسنت! اجتزت "${level.title}" بنتيجة ${score}%. ${nextLevelId ? "المستوى التالي جاهز لك." : ""}`,
+          `أحسنت! أتممت جميع قواعد "${level.title}". ${nextLevelId ? "المستوى التالي جاهز لك." : ""}`,
           "level"
+        );
+      } else if (passed) {
+        await createUserNotification(
+          userId,
+          "✅ اجتزت الامتحان!",
+          `أحسنت! اجتزت امتحان "${ruleTitle}" بنتيجة ${score}%.`,
+          "exam"
         );
       } else {
         await createUserNotification(
           userId,
           "📊 نتيجة الامتحان",
-          `حصلت على ${score}% في "${level.title}". ${score >= 50 ? "استمر بالتدريب لتحسين نتيجتك!" : "راجع القاعدة وحاول مجدداً."}`,
+          `حصلت على ${score}% في "${ruleTitle}". ${score >= 50 ? "استمر بالتدريب لتحسين نتيجتك!" : "راجع القاعدة وحاول مجدداً."}`,
           "exam"
         );
       }
     }
 
-    res.json({ score, passed, xpEarned, newStreak, badgeEarned, badge: badge || undefined, nextLevelId });
+    res.json({ score, passed, xpEarned, newStreak, badgeEarned, badge: badge || undefined, nextLevelId, allRulesPassed });
   } catch (err) {
+    console.error("Complete exam error:", err);
     res.status(500).json({ error: "Failed to complete exam" });
   }
 });

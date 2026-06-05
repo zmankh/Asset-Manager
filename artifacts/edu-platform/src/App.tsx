@@ -79,6 +79,7 @@ function Router() {
       <Route path="/admin/settings" component={() => <AuthGuard adminOnly><AdminSettings /></AuthGuard>} />
       
       <Route path="/badges" component={() => <AuthGuard><Badges /></AuthGuard>} />
+      <Route path="/exam/:levelId/:ruleId" component={() => <AuthGuard><Exam /></AuthGuard>} />
       <Route path="/exam/:levelId" component={() => <AuthGuard><Exam /></AuthGuard>} />
       
       <Route component={NotFound} />
