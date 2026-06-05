@@ -79,6 +79,33 @@ router.post("/mark-all-read", requireAuth, async (req: any, res) => {
   }
 });
 
+// GET streak reminder status (admin)
+router.get("/streak-reminders/status", requireAdmin, async (req, res) => {
+  try {
+    const db = getFirestore();
+    const settingsDoc = await db.collection("siteSettings").doc("main").get();
+    const settings = settingsDoc.data() as any ?? {};
+    res.json({
+      enabled: settings.streakReminderEnabled ?? false,
+      lastRun: settings.streakReminderLastRun ?? null,
+      lastSentCount: settings.streakReminderLastSentCount ?? 0,
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to get streak reminder status" });
+  }
+});
+
+// POST manually trigger streak reminders (admin)
+router.post("/streak-reminders/run", requireAdmin, async (req, res) => {
+  try {
+    const { runStreakReminders } = await import("../lib/streak-scheduler.js");
+    const result = await runStreakReminders();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to run streak reminders" });
+  }
+});
+
 // GET broadcast history (admin)
 router.get("/broadcasts", requireAdmin, async (req, res) => {
   try {

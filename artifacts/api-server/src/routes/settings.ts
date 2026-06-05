@@ -31,6 +31,7 @@ router.patch("/", requireAdmin, async (req, res) => {
     const allowed = [
       "platformTitle", "platformSubtitle",
       "homeWelcomeTitle", "homeAnnouncementActive", "homeAnnouncementText",
+      "streakReminderEnabled",
     ];
     const update: Record<string, any> = {};
     for (const key of allowed) {

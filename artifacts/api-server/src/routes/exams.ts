@@ -41,6 +41,12 @@ router.post("/start", requireAuth, async (req, res) => {
     };
 
     const ref = await db.collection("quizSessions").add(sessionData);
+
+    // Update lastActiveAt for streak tracking
+    if (userId) {
+      await db.collection("users").doc(userId).update({ lastActiveAt: new Date().toISOString() }).catch(() => {});
+    }
+
     res.status(201).json({ sessionId: ref.id, userId, ruleId: level.ruleId, levelId, questions: selected, startedAt: sessionData.startedAt });
   } catch (err) {
     res.status(500).json({ error: "Failed to start exam" });

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   useListNotifications,
   useCreateNotification,
@@ -15,7 +15,10 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Trash2, Edit, Plus, Send, Users, User, History, Bell, Megaphone } from "lucide-react";
+import {
+  Trash2, Edit, Plus, Send, Users, User, History,
+  Bell, Megaphone, Flame, Play, Clock, CheckCircle2
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
@@ -24,7 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { auth } from "@/lib/firebase";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface BroadcastRecord {
   id: string;
@@ -37,7 +40,13 @@ interface BroadcastRecord {
   sentAt: string;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+interface StreakStatus {
+  enabled: boolean;
+  lastRun: string | null;
+  lastSentCount: number;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "/api";
 
@@ -64,11 +73,11 @@ function timeAgo(iso: string) {
 }
 
 const typeOptions = [
-  { value: "info", label: "معلومة", color: "bg-blue-50 text-blue-700 border-blue-200" },
-  { value: "announcement", label: "إعلان", color: "bg-purple-50 text-purple-700 border-purple-200" },
-  { value: "level", label: "مستوى", color: "bg-green-50 text-green-700 border-green-200" },
-  { value: "streak", label: "متتالية", color: "bg-orange-50 text-orange-700 border-orange-200" },
-  { value: "badge", label: "وسام", color: "bg-yellow-50 text-yellow-700 border-yellow-200" },
+  { value: "info",         label: "معلومة",   color: "bg-blue-50 text-blue-700 border-blue-200" },
+  { value: "announcement", label: "إعلان",    color: "bg-purple-50 text-purple-700 border-purple-200" },
+  { value: "level",        label: "مستوى",    color: "bg-green-50 text-green-700 border-green-200" },
+  { value: "streak",       label: "متتالية",  color: "bg-orange-50 text-orange-700 border-orange-200" },
+  { value: "badge",        label: "وسام",     color: "bg-yellow-50 text-yellow-700 border-yellow-200" },
 ];
 
 function TypeBadge({ type }: { type: string }) {
@@ -83,35 +92,42 @@ function TypeBadge({ type }: { type: string }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AdminNotifications() {
-  // ── Global notifications (existing) ──────────────────────────────────────
+
+  // ── Global notifications ──────────────────────────────────────────────────
   const { data: notifications, isLoading } = useListNotifications();
-  const [isOpen, setIsOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<{ title: string; message: string; type: any; active: boolean }>({
+  const [isOpen, setIsOpen]         = useState(false);
+  const [editingId, setEditingId]   = useState<string | null>(null);
+  const [formData, setFormData]     = useState<{ title: string; message: string; type: any; active: boolean }>({
     title: "", message: "", type: "info", active: true,
   });
-  const createMutation = useCreateNotification();
-  const updateMutation = useUpdateNotification();
-  const deleteMutation = useDeleteNotification();
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
+  const createMutation  = useCreateNotification();
+  const updateMutation  = useUpdateNotification();
+  const deleteMutation  = useDeleteNotification();
+  const queryClient     = useQueryClient();
+  const { toast }       = useToast();
 
-  // ── Broadcast ────────────────────────────────────────────────────────────
+  // ── Broadcast ─────────────────────────────────────────────────────────────
   const { data: allUsers } = useListUsers();
   const students = (allUsers ?? []).filter((u: any) => u.role === "student");
 
-  const [bTarget, setBTarget] = useState<"all" | "specific">("all");
-  const [bUserId, setBUserId] = useState("");
-  const [bType, setBType] = useState("info");
-  const [bTitle, setBTitle] = useState("");
-  const [bMessage, setBMessage] = useState("");
-  const [bSending, setBSending] = useState(false);
-  const [userSearch, setUserSearch] = useState("");
+  const [bTarget,     setBTarget]     = useState<"all" | "specific">("all");
+  const [bUserId,     setBUserId]     = useState("");
+  const [bType,       setBType]       = useState("info");
+  const [bTitle,      setBTitle]      = useState("");
+  const [bMessage,    setBMessage]    = useState("");
+  const [bSending,    setBSending]    = useState(false);
+  const [userSearch,  setUserSearch]  = useState("");
 
-  const [history, setHistory] = useState<BroadcastRecord[]>([]);
+  const [history,        setHistory]        = useState<BroadcastRecord[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  const fetchHistory = async () => {
+  // ── Streak Reminder ───────────────────────────────────────────────────────
+  const [streakStatus,  setStreakStatus]  = useState<StreakStatus | null>(null);
+  const [streakLoading, setStreakLoading] = useState(false);
+  const [streakRunning, setStreakRunning] = useState(false);
+  const [streakToggling, setStreakToggling] = useState(false);
+
+  const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
       const r = await apiFetch("/user-notifications/broadcasts");
@@ -119,9 +135,57 @@ export default function AdminNotifications() {
     } finally {
       setHistoryLoading(false);
     }
+  }, []);
+
+  const fetchStreakStatus = useCallback(async () => {
+    setStreakLoading(true);
+    try {
+      const r = await apiFetch("/user-notifications/streak-reminders/status");
+      if (r.ok) setStreakStatus(await r.json());
+    } finally {
+      setStreakLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchHistory();
+    fetchStreakStatus();
+  }, [fetchHistory, fetchStreakStatus]);
+
+  const handleToggleStreak = async (enabled: boolean) => {
+    setStreakToggling(true);
+    try {
+      const r = await apiFetch("/settings", {
+        method: "PATCH",
+        body: JSON.stringify({ streakReminderEnabled: enabled }),
+      });
+      if (!r.ok) throw new Error();
+      setStreakStatus((prev) => prev ? { ...prev, enabled } : null);
+      toast({ title: enabled ? "✅ تم تفعيل تذكير المتتالية" : "⏸️ تم إيقاف التذكير" });
+    } catch {
+      toast({ title: "حدث خطأ", variant: "destructive" });
+    } finally {
+      setStreakToggling(false);
+    }
   };
 
-  useEffect(() => { fetchHistory(); }, []);
+  const handleRunStreak = async () => {
+    setStreakRunning(true);
+    try {
+      const r = await apiFetch("/user-notifications/streak-reminders/run", { method: "POST" });
+      if (!r.ok) throw new Error();
+      const data = await r.json();
+      toast({
+        title: "🔥 تم إرسال تذكيرات المتتالية",
+        description: `أُرسل إلى ${data.sent} طالب • تم تخطي ${data.skipped} طالب نشط`,
+      });
+      fetchStreakStatus();
+    } catch {
+      toast({ title: "حدث خطأ أثناء الإرسال", variant: "destructive" });
+    } finally {
+      setStreakRunning(false);
+    }
+  };
 
   const filteredStudents = students.filter((u: any) => {
     if (!userSearch) return true;
@@ -135,13 +199,14 @@ export default function AdminNotifications() {
     e.preventDefault();
     if (!bTitle.trim() || !bMessage.trim()) return;
     if (bTarget === "specific" && !bUserId) {
-      toast({ title: "اختر طالباً", variant: "destructive" }); return;
+      toast({ title: "اختر طالباً", variant: "destructive" });
+      return;
     }
     setBSending(true);
     try {
       const body: any = { title: bTitle, message: bMessage, type: bType };
       if (bTarget === "specific") {
-        body.targetUserId = bUserId;
+        body.targetUserId   = bUserId;
         body.targetUserName = selectedUser?.displayName ?? selectedUser?.email ?? bUserId;
       }
       const r = await apiFetch("/user-notifications/broadcast", {
@@ -149,7 +214,7 @@ export default function AdminNotifications() {
       });
       if (!r.ok) throw new Error();
       const data = await r.json();
-      toast({ title: `✅ تم الإرسال بنجاح`, description: `أُرسل إلى ${data.sent} طالب` });
+      toast({ title: "✅ تم الإرسال بنجاح", description: `أُرسل إلى ${data.sent} طالب` });
       setBTitle(""); setBMessage(""); setBUserId(""); setUserSearch("");
       fetchHistory();
     } catch {
@@ -211,15 +276,19 @@ export default function AdminNotifications() {
         <TabsList className="mb-4">
           <TabsTrigger value="broadcast" className="gap-2">
             <Megaphone className="w-4 h-4" />
-            إرسال إشعار شخصي
+            إرسال شخصي
+          </TabsTrigger>
+          <TabsTrigger value="streak" className="gap-2">
+            <Flame className="w-4 h-4" />
+            تذكير المتتالية
           </TabsTrigger>
           <TabsTrigger value="global" className="gap-2">
             <Bell className="w-4 h-4" />
-            الإشعارات العامة
+            إشعارات عامة
           </TabsTrigger>
         </TabsList>
 
-        {/* ── Tab: Broadcast ─────────────────────────────────────────────── */}
+        {/* ══ Tab: Broadcast ═════════════════════════════════════════════════ */}
         <TabsContent value="broadcast" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
 
@@ -230,42 +299,33 @@ export default function AdminNotifications() {
                   <Send className="w-5 h-5 text-primary" />
                   إرسال إشعار
                 </CardTitle>
-                <CardDescription>
-                  أرسل إشعاراً لجميع الطلاب أو لطالب محدد
-                </CardDescription>
+                <CardDescription>أرسل إشعاراً لجميع الطلاب أو لطالب محدد</CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleBroadcast} className="space-y-4">
-                  {/* Target selector */}
+
+                  {/* Target buttons */}
                   <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => { setBTarget("all"); setBUserId(""); }}
-                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border-2 text-sm font-semibold transition-all ${
-                        bTarget === "all"
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-muted-foreground hover:border-primary/40"
-                      }`}
-                    >
-                      <Users className="w-4 h-4" />
-                      جميع الطلاب
-                      <span className="text-xs opacity-70">({students.length})</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setBTarget("specific")}
-                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border-2 text-sm font-semibold transition-all ${
-                        bTarget === "specific"
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-muted-foreground hover:border-primary/40"
-                      }`}
-                    >
-                      <User className="w-4 h-4" />
-                      طالب محدد
-                    </button>
+                    {[
+                      { val: "all",      icon: <Users className="w-4 h-4" />,  label: `جميع الطلاب (${students.length})` },
+                      { val: "specific", icon: <User className="w-4 h-4" />,   label: "طالب محدد" },
+                    ].map(({ val, icon, label }) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => { setBTarget(val as any); if (val === "all") setBUserId(""); }}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border-2 text-sm font-semibold transition-all ${
+                          bTarget === val
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border text-muted-foreground hover:border-primary/40"
+                        }`}
+                      >
+                        {icon}{label}
+                      </button>
+                    ))}
                   </div>
 
-                  {/* Student search (if specific) */}
+                  {/* Student search */}
                   {bTarget === "specific" && (
                     <div className="space-y-2">
                       <Label>اختر الطالب</Label>
@@ -274,7 +334,7 @@ export default function AdminNotifications() {
                         value={userSearch}
                         onChange={(e) => { setUserSearch(e.target.value); setBUserId(""); }}
                       />
-                      {userSearch && (
+                      {userSearch && !bUserId && (
                         <div className="border border-border rounded-xl overflow-hidden">
                           <ScrollArea className="max-h-44">
                             {filteredStudents.length === 0 ? (
@@ -285,9 +345,7 @@ export default function AdminNotifications() {
                                   key={u.id}
                                   type="button"
                                   onClick={() => { setBUserId(u.id); setUserSearch(u.displayName ?? u.email ?? u.id); }}
-                                  className={`w-full text-right px-4 py-2.5 hover:bg-muted/40 transition-colors flex items-center justify-between gap-3 ${
-                                    bUserId === u.id ? "bg-primary/10" : ""
-                                  }`}
+                                  className="w-full text-right px-4 py-2.5 hover:bg-muted/40 transition-colors flex items-center justify-between gap-3"
                                 >
                                   <div>
                                     <p className="text-sm font-semibold">{u.displayName ?? "—"}</p>
@@ -302,26 +360,23 @@ export default function AdminNotifications() {
                           </ScrollArea>
                         </div>
                       )}
-                      {bUserId && (
+                      {bUserId && selectedUser && (
                         <div className="flex items-center gap-2 px-3 py-2 bg-primary/5 border border-primary/20 rounded-xl">
                           <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">
-                            {(selectedUser?.displayName ?? selectedUser?.email ?? "؟")[0]}
+                            {(selectedUser.displayName ?? selectedUser.email ?? "؟")[0]}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold truncate">{selectedUser?.displayName ?? selectedUser?.email}</p>
-                            <p className="text-xs text-muted-foreground truncate">{selectedUser?.email}</p>
+                            <p className="text-sm font-semibold truncate">{selectedUser.displayName ?? selectedUser.email}</p>
+                            <p className="text-xs text-muted-foreground truncate">{selectedUser.email}</p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => { setBUserId(""); setUserSearch(""); }}
-                            className="text-xs text-muted-foreground hover:text-destructive"
-                          >✕</button>
+                          <button type="button" onClick={() => { setBUserId(""); setUserSearch(""); }}
+                            className="text-xs text-muted-foreground hover:text-destructive">✕</button>
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* Type */}
+                  {/* Type pills */}
                   <div className="space-y-2">
                     <Label>نوع الإشعار</Label>
                     <div className="flex flex-wrap gap-2">
@@ -335,50 +390,39 @@ export default function AdminNotifications() {
                               ? t.color + " border-current scale-105 shadow-sm"
                               : "border-border text-muted-foreground hover:border-primary/30"
                           }`}
-                        >
-                          {t.label}
-                        </button>
+                        >{t.label}</button>
                       ))}
                     </div>
                   </div>
 
                   {/* Title */}
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     <Label>العنوان</Label>
                     <Input
-                      required
-                      placeholder="مثال: إعلان هام..."
-                      value={bTitle}
-                      onChange={(e) => setBTitle(e.target.value)}
-                      maxLength={80}
+                      required placeholder="مثال: إعلان هام..."
+                      value={bTitle} onChange={(e) => setBTitle(e.target.value)} maxLength={80}
                     />
-                    <p className="text-xs text-muted-foreground text-left">{bTitle.length}/80</p>
+                    <p className="text-[11px] text-muted-foreground text-left">{bTitle.length}/80</p>
                   </div>
 
                   {/* Message */}
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     <Label>الرسالة</Label>
                     <Textarea
-                      required
-                      placeholder="اكتب نص الإشعار هنا..."
-                      value={bMessage}
-                      onChange={(e) => setBMessage(e.target.value)}
-                      rows={3}
-                      maxLength={300}
+                      required placeholder="اكتب نص الإشعار هنا..."
+                      value={bMessage} onChange={(e) => setBMessage(e.target.value)} rows={3} maxLength={300}
                     />
-                    <p className="text-xs text-muted-foreground text-left">{bMessage.length}/300</p>
+                    <p className="text-[11px] text-muted-foreground text-left">{bMessage.length}/300</p>
                   </div>
 
-                  {/* Preview */}
+                  {/* Live preview */}
                   {(bTitle || bMessage) && (
-                    <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-4 space-y-1">
-                      <p className="text-xs font-bold text-primary/70 mb-2">معاينة</p>
+                    <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-4">
+                      <p className="text-[11px] font-bold text-primary/70 mb-2">معاينة الإشعار</p>
                       <div className="flex items-start gap-3">
                         <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                          bType === "badge" ? "bg-yellow-100" :
-                          bType === "level" ? "bg-green-100" :
-                          bType === "streak" ? "bg-orange-100" :
-                          "bg-blue-100"
+                          bType === "badge" ? "bg-yellow-100" : bType === "level" ? "bg-green-100" :
+                          bType === "streak" ? "bg-orange-100" : "bg-blue-100"
                         }`}>
                           <span className="text-sm">
                             {bType === "badge" ? "🏅" : bType === "level" ? "🎉" : bType === "streak" ? "🔥" : "ℹ️"}
@@ -393,16 +437,13 @@ export default function AdminNotifications() {
                   )}
 
                   <Button
-                    type="submit"
+                    type="submit" size="lg" className="w-full gap-2"
                     disabled={bSending || !bTitle || !bMessage || (bTarget === "specific" && !bUserId)}
-                    className="w-full gap-2"
-                    size="lg"
                   >
                     {bSending ? (
-                      <><span className="animate-spin">⏳</span> جاري الإرسال...</>
+                      <><span className="animate-spin inline-block">⏳</span> جاري الإرسال...</>
                     ) : (
-                      <>
-                        <Send className="w-4 h-4" />
+                      <><Send className="w-4 h-4" />
                         {bTarget === "all" ? `إرسال لجميع الطلاب (${students.length})` : "إرسال للطالب"}
                       </>
                     )}
@@ -411,7 +452,7 @@ export default function AdminNotifications() {
               </CardContent>
             </Card>
 
-            {/* History */}
+            {/* History panel */}
             <Card className="lg:col-span-2">
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -419,11 +460,7 @@ export default function AdminNotifications() {
                     <History className="w-4 h-4 text-muted-foreground" />
                     سجل الإرسال
                   </CardTitle>
-                  <button
-                    onClick={fetchHistory}
-                    className="text-xs text-primary hover:underline"
-                    disabled={historyLoading}
-                  >
+                  <button onClick={fetchHistory} className="text-xs text-primary hover:underline" disabled={historyLoading}>
                     تحديث
                   </button>
                 </div>
@@ -431,9 +468,7 @@ export default function AdminNotifications() {
               <CardContent className="p-0">
                 <ScrollArea className="h-[520px]">
                   {historyLoading ? (
-                    <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
-                      جاري التحميل...
-                    </div>
+                    <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">جاري التحميل...</div>
                   ) : history.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-32 text-muted-foreground gap-2">
                       <History className="w-6 h-6 opacity-30" />
@@ -449,19 +484,9 @@ export default function AdminNotifications() {
                           </div>
                           <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{h.message}</p>
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1.5">
-                              {h.target === "all" ? (
-                                <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full flex items-center gap-1">
-                                  <Users className="w-2.5 h-2.5" />
-                                  {h.sentCount} طالب
-                                </span>
-                              ) : (
-                                <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full flex items-center gap-1">
-                                  <User className="w-2.5 h-2.5" />
-                                  {h.targetUserName ?? "طالب محدد"}
-                                </span>
-                              )}
-                            </div>
+                            <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full flex items-center gap-1">
+                              {h.target === "all" ? <><Users className="w-2.5 h-2.5" />{h.sentCount} طالب</> : <><User className="w-2.5 h-2.5" />{h.targetUserName ?? "طالب محدد"}</>}
+                            </span>
                             <p className="text-[10px] text-muted-foreground/60">{timeAgo(h.sentAt)}</p>
                           </div>
                         </div>
@@ -474,20 +499,124 @@ export default function AdminNotifications() {
           </div>
         </TabsContent>
 
-        {/* ── Tab: Global Notifications ──────────────────────────────────── */}
+        {/* ══ Tab: Streak Reminder ═══════════════════════════════════════════ */}
+        <TabsContent value="streak" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl">
+
+            {/* Main control card */}
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Flame className="w-5 h-5 text-orange-500" />
+                  تذكير المتتالية اليومي
+                </CardTitle>
+                <CardDescription>
+                  يُرسل إشعاراً تلقائياً للطلاب الذين لم يتدربوا منذ أكثر من 22 ساعة.
+                  يتحقق النظام تلقائياً كل ساعة عند التفعيل.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Toggle row */}
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/40 border border-border">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                      streakStatus?.enabled ? "bg-orange-100" : "bg-muted"
+                    }`}>
+                      <Flame className={`w-5 h-5 ${streakStatus?.enabled ? "text-orange-500" : "text-muted-foreground"}`} />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">التذكير التلقائي</p>
+                      <p className="text-xs text-muted-foreground">
+                        {streakStatus?.enabled ? "مفعّل — يتحقق كل ساعة" : "موقوف حالياً"}
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={streakStatus?.enabled ?? false}
+                    onCheckedChange={handleToggleStreak}
+                    disabled={streakLoading || streakToggling}
+                  />
+                </div>
+
+                {/* Status stats */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-xl border border-border p-4 text-center space-y-1">
+                    <p className="text-2xl font-black text-foreground">
+                      {streakStatus?.lastSentCount ?? 0}
+                    </p>
+                    <p className="text-xs text-muted-foreground">آخر إرسال</p>
+                  </div>
+                  <div className="rounded-xl border border-border p-4 text-center space-y-1">
+                    <p className="text-2xl font-black text-foreground">
+                      {students.length}
+                    </p>
+                    <p className="text-xs text-muted-foreground">إجمالي الطلاب</p>
+                  </div>
+                  <div className="rounded-xl border border-border p-4 text-center space-y-1">
+                    <div className="flex items-center justify-center gap-1">
+                      {streakStatus?.enabled
+                        ? <CheckCircle2 className="w-5 h-5 text-green-500" />
+                        : <Clock className="w-5 h-5 text-muted-foreground" />
+                      }
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {streakStatus?.enabled ? "نشط" : "موقوف"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Last run info */}
+                {streakStatus?.lastRun && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground px-1">
+                    <Clock className="w-4 h-4 shrink-0" />
+                    <span>آخر تشغيل: <strong className="text-foreground">{timeAgo(streakStatus.lastRun)}</strong></span>
+                  </div>
+                )}
+
+                {/* How it works */}
+                <div className="rounded-xl bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/40 p-4 space-y-2">
+                  <p className="text-sm font-bold text-orange-700 dark:text-orange-400">كيف يعمل؟</p>
+                  <ul className="text-xs text-orange-600 dark:text-orange-400/80 space-y-1 list-disc list-inside">
+                    <li>يتحقق كل ساعة من قائمة الطلاب غير النشطين</li>
+                    <li>يُرسل لكل طالب لم يتدرب منذ أكثر من 22 ساعة</li>
+                    <li>لا يُرسل أكثر من تذكير واحد في اليوم لنفس الطالب</li>
+                    <li>يذكر الطالب بعدد أيام متتاليته الحالية</li>
+                  </ul>
+                </div>
+
+                {/* Manual trigger */}
+                <div className="pt-2">
+                  <Button
+                    onClick={handleRunStreak}
+                    disabled={streakRunning}
+                    variant="outline"
+                    className="w-full gap-2 border-orange-300 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
+                    size="lg"
+                  >
+                    {streakRunning ? (
+                      <><span className="animate-spin inline-block">⏳</span> جاري الإرسال...</>
+                    ) : (
+                      <><Play className="w-4 h-4" /> تشغيل يدوي الآن</>
+                    )}
+                  </Button>
+                  <p className="text-xs text-center text-muted-foreground mt-2">
+                    يُرسل تذكيرات فورية للطلاب غير النشطين بصرف النظر عن الجدولة
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* ══ Tab: Global Notifications ══════════════════════════════════════ */}
         <TabsContent value="global" className="space-y-4">
           <div className="flex justify-between items-center">
-            <div>
-              <p className="text-sm text-muted-foreground">
-                تظهر هذه الإشعارات كبانر لجميع المستخدمين في الموقع
-              </p>
-            </div>
+            <p className="text-sm text-muted-foreground">تظهر هذه الإشعارات كبانر لجميع المستخدمين في الموقع</p>
             <Button onClick={handleOpenCreate} className="gap-2">
               <Plus className="w-4 h-4" />
               إشعار جديد
             </Button>
           </div>
-
           <Card>
             <CardContent className="pt-6">
               <Table>
@@ -502,9 +631,7 @@ export default function AdminNotifications() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">جاري التحميل...</TableCell>
-                    </TableRow>
+                    <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">جاري التحميل...</TableCell></TableRow>
                   ) : !notifications?.length ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
@@ -516,25 +643,15 @@ export default function AdminNotifications() {
                     notifications?.map((n) => (
                       <TableRow key={n.id}>
                         <TableCell>
-                          <Switch
-                            checked={n.active}
-                            onCheckedChange={() => handleToggleActive(n.id, n.active)}
-                            disabled={updateMutation.isPending}
-                          />
+                          <Switch checked={n.active} onCheckedChange={() => handleToggleActive(n.id, n.active)} disabled={updateMutation.isPending} />
                         </TableCell>
                         <TableCell className="font-medium">{n.title}</TableCell>
                         <TableCell className="max-w-[260px] truncate text-muted-foreground text-sm">{n.message}</TableCell>
                         <TableCell><TypeBadge type={n.type || "info"} /></TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(n)}>
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost" size="icon"
-                              className="text-destructive hover:bg-destructive/10"
-                              onClick={() => handleDelete(n.id)}
-                            >
+                            <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(n)}><Edit className="w-4 h-4" /></Button>
+                            <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" onClick={() => handleDelete(n.id)}>
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
@@ -558,11 +675,7 @@ export default function AdminNotifications() {
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="flex items-center gap-3">
-                <Switch
-                  id="active"
-                  checked={formData.active}
-                  onCheckedChange={(v) => setFormData({ ...formData, active: v })}
-                />
+                <Switch id="active" checked={formData.active} onCheckedChange={(v) => setFormData({ ...formData, active: v })} />
                 <Label htmlFor="active">إشعار نشط (يظهر للجميع)</Label>
               </div>
               <div className="space-y-2">
@@ -583,12 +696,7 @@ export default function AdminNotifications() {
               </div>
               <div className="space-y-2">
                 <Label>الرسالة</Label>
-                <Textarea
-                  required
-                  rows={3}
-                  value={formData.message}
-                  onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                />
+                <Textarea required rows={3} value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })} />
               </div>
             </div>
             <DialogFooter>
