@@ -25,6 +25,7 @@ export async function createUserNotification(
   }
 }
 
+// GET user's own notifications
 router.get("/", requireAuth, async (req: any, res) => {
   try {
     const db = getFirestore();
@@ -43,12 +44,13 @@ router.get("/", requireAuth, async (req: any, res) => {
   }
 });
 
+// Mark single notification as read
 router.patch("/:id/read", requireAuth, async (req: any, res) => {
   try {
     const db = getFirestore();
     const ref = db.collection("userNotifications").doc(req.params.id);
-    const doc = await ref.get();
-    if (!doc.exists || (doc.data() as any).userId !== req.user.uid) {
+    const docSnap = await ref.get();
+    if (!docSnap.exists || (docSnap.data() as any).userId !== req.user.uid) {
       return res.status(404).json({ error: "Not found" });
     }
     await ref.update({ read: true });
@@ -58,6 +60,7 @@ router.patch("/:id/read", requireAuth, async (req: any, res) => {
   }
 });
 
+// Mark all as read
 router.post("/mark-all-read", requireAuth, async (req: any, res) => {
   try {
     const db = getFirestore();
@@ -76,30 +79,67 @@ router.post("/mark-all-read", requireAuth, async (req: any, res) => {
   }
 });
 
-router.post("/broadcast", requireAdmin, async (req, res) => {
+// GET broadcast history (admin)
+router.get("/broadcasts", requireAdmin, async (req, res) => {
   try {
     const db = getFirestore();
-    const { title, message, type = "info", targetUserId } = req.body;
+    const snap = await db.collection("broadcasts").get();
+    const sorted = snap.docs
+      .map((d) => ({ id: d.id, ...(d.data() as any) }))
+      .sort((a, b) => b.sentAt.localeCompare(a.sentAt))
+      .slice(0, 30);
+    res.json(sorted);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to get broadcast history" });
+  }
+});
+
+// Broadcast notification (admin)
+router.post("/broadcast", requireAdmin, async (req: any, res) => {
+  try {
+    const db = getFirestore();
+    const { title, message, type = "info", targetUserId, targetUserName } = req.body;
     if (!title || !message) {
       return res.status(400).json({ error: "title and message are required" });
     }
+
+    let sentCount = 0;
+
     if (targetUserId) {
       await createUserNotification(targetUserId, title, message, type);
-      return res.json({ sent: 1 });
-    }
-    const usersSnap = await db.collection("users").where("role", "==", "student").get();
-    const batch = db.batch();
-    usersSnap.docs.forEach((u) => {
-      const ref = db.collection("userNotifications").doc();
-      batch.set(ref, {
-        userId: u.id,
-        title, message, type,
-        read: false,
-        createdAt: new Date().toISOString(),
+      sentCount = 1;
+    } else {
+      const usersSnap = await db.collection("users").where("role", "==", "student").get();
+      const batch = db.batch();
+      usersSnap.docs.forEach((u) => {
+        const ref = db.collection("userNotifications").doc();
+        batch.set(ref, {
+          userId: u.id,
+          title,
+          message,
+          type,
+          read: false,
+          createdAt: new Date().toISOString(),
+        });
       });
+      await batch.commit();
+      sentCount = usersSnap.size;
+    }
+
+    // Save broadcast history
+    await db.collection("broadcasts").add({
+      title,
+      message,
+      type,
+      target: targetUserId ? "specific" : "all",
+      targetUserId: targetUserId || null,
+      targetUserName: targetUserName || null,
+      sentCount,
+      sentAt: new Date().toISOString(),
+      sentBy: req.user?.uid || "admin",
     });
-    await batch.commit();
-    res.json({ sent: usersSnap.size });
+
+    res.json({ sent: sentCount });
   } catch (err) {
     res.status(500).json({ error: "Failed to broadcast notification" });
   }
