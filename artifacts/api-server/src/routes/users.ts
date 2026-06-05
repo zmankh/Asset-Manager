@@ -192,6 +192,82 @@ router.delete("/:userId", requireAdmin, async (req, res) => {
   }
 });
 
+// Get per-level progress summary for a user (admin or self)
+router.get("/:userId/level-progress", requireAuth, async (req, res) => {
+  try {
+    const db = getFirestore();
+
+    // Fetch all levels (sorted by order field — single-field index is fine)
+    const levelsSnap = await db.collection("levels").orderBy("order").get();
+    const levels = levelsSnap.docs.map((d) => {
+      const data = d.data() as any;
+      const ruleIds: string[] = Array.isArray(data.ruleIds) && data.ruleIds.length > 0
+        ? data.ruleIds
+        : data.ruleId ? [data.ruleId] : [];
+      return { id: d.id, ...data, ruleIds };
+    });
+
+    // Fetch all progress docs for this user (no composite index needed — two == conditions)
+    const progressSnap = await db.collection("userProgress")
+      .where("userId", "==", req.params.userId)
+      .get();
+    const progressDocs = progressSnap.docs.map((d) => ({ id: d.id, ...d.data() as any }));
+
+    // Build per-level summary
+    const summary = await Promise.all(
+      levels.map(async (level) => {
+        const levelProgress = progressDocs.filter((p) => p.levelId === level.id);
+
+        // Fetch rule titles
+        const rules = await Promise.all(
+          level.ruleIds.map(async (ruleId: string) => {
+            const ruleDoc = await db.collection("grammarRules").doc(ruleId).get();
+            const ruleTitle = ruleDoc.exists ? (ruleDoc.data() as any).title : ruleId;
+            const progressForRule = levelProgress.find((p) => p.ruleId === ruleId);
+            return {
+              ruleId,
+              ruleTitle,
+              attempted: !!progressForRule,
+              passed: progressForRule?.passed ?? false,
+              bestScore: progressForRule?.score ?? null,
+              attempts: progressForRule?.attempts ?? 0,
+              lastAttempt: progressForRule?.completedAt ?? null,
+            };
+          })
+        );
+
+        const rulesPassed = rules.filter((r) => r.passed).length;
+        const rulesTotal = rules.length;
+        const levelPassed = rulesTotal > 0 && rulesPassed === rulesTotal;
+        const lastAttempt = rules
+          .map((r) => r.lastAttempt)
+          .filter(Boolean)
+          .sort()
+          .reverse()[0] ?? null;
+
+        return {
+          levelId: level.id,
+          levelTitle: level.title,
+          levelOrder: level.order,
+          categories: level.categories || [],
+          active: level.active,
+          rulesTotal,
+          rulesPassed,
+          percent: rulesTotal > 0 ? Math.round((rulesPassed / rulesTotal) * 100) : 0,
+          levelPassed,
+          lastAttempt,
+          rules,
+        };
+      })
+    );
+
+    res.json(summary);
+  } catch (err) {
+    console.error("Level progress error:", err);
+    res.status(500).json({ error: "Failed to get level progress" });
+  }
+});
+
 // Update streak
 router.patch("/:userId/streak", requireAuth, async (req, res) => {
   try {

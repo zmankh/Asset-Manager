@@ -14,6 +14,7 @@ import {
   Zap,
   Layers,
   SlidersHorizontal,
+  BarChart2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/notification-bell";
@@ -28,6 +29,7 @@ const studentLinks = [
 const adminLinks = [
   { href: "/admin", label: "لوحة التحكم", icon: LayoutDashboard },
   { href: "/admin/users", label: "إدارة المستخدمين", icon: Users },
+  { href: "/admin/student-progress", label: "تقدم الطلاب", icon: BarChart2 },
   { href: "/admin/levels", label: "المستويات", icon: Layers },
   { href: "/admin/rules", label: "القواعد النحوية", icon: BookOpen },
   { href: "/admin/questions", label: "بنك الأسئلة", icon: Settings },
