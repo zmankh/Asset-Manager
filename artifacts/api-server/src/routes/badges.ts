@@ -9,9 +9,11 @@ router.get("/:userId", requireAuth, async (req, res) => {
     const db = getFirestore();
     const snap = await db.collection("badges")
       .where("userId", "==", req.params.userId)
-      .orderBy("earnedAt", "desc")
       .get();
-    res.json(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    const sorted = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() as any }))
+      .sort((a, b) => (b.earnedAt || "").localeCompare(a.earnedAt || ""));
+    res.json(sorted);
   } catch (err) {
     res.status(500).json({ error: "Failed to get badges" });
   }

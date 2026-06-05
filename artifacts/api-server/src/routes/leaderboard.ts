@@ -11,22 +11,24 @@ async function buildLeaderboard(type: "annual" | "weekly") {
   const snap = await db
     .collection("users")
     .where("role", "==", "student")
-    .orderBy(field, "desc")
-    .limit(50)
     .get();
 
   const titlesSnap = await db.collection("leaderboardTitles").get();
   const titles = titlesSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
 
-  const entries = snap.docs.map((d, i) => {
-    const data = d.data() as any;
+  const sorted = snap.docs
+    .map((d) => ({ id: d.id, ...(d.data() as any) }))
+    .sort((a, b) => (b[field] || 0) - (a[field] || 0))
+    .slice(0, 50);
+
+  const entries = sorted.map((data, i) => {
     const rank = i + 1;
     const matchedTitle = titles.find(
       (t: any) => rank >= t.minRank && rank <= t.maxRank
     );
     return {
       rank,
-      userId: d.id,
+      userId: data.id,
       displayName: data.displayName,
       xp: data[field] || 0,
       title: matchedTitle ? matchedTitle.title : data.title || null,
