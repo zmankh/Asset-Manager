@@ -30,8 +30,12 @@ export default function StudentDashboard() {
   const { user } = useAuth();
   
   // User data
-  const { data: userData, isLoading: isUserLoading } = useGetUser(user?.uid || "", {
-    query: { enabled: !!user?.uid, queryKey: getGetUserQueryKey(user?.uid || "") }
+  const { data: userData, isLoading: isUserLoading, isError: isUserError } = useGetUser(user?.uid || "", {
+    query: {
+      enabled: !!user?.uid,
+      queryKey: getGetUserQueryKey(user?.uid || ""),
+      retry: 1,
+    }
   });
 
   // Notifications
@@ -85,7 +89,7 @@ export default function StudentDashboard() {
 
   const currentXP = userData?.xpAnnual || 0;
 
-  if (isUserLoading) {
+  if (isUserLoading && !isUserError) {
     return <div className="flex h-64 items-center justify-center">جاري التحميل...</div>;
   }
 
