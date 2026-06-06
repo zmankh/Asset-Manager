@@ -1,0 +1,43 @@
+Please implement a major update to our Next.js + Firebase project. Address the following performance issues, Admin UI improvements, Student Progression logic, Anti-Farming XP system, and Creative UI additions:
+
+1. Performance Optimization (CRITICAL FIX):
+- Fix the severe 10-second delay when fetching data from Firestore.
+- Implement React Suspense, loading skeletons, and Firebase query optimization (indexing). 
+- Use Pagination or infinite scrolling in the Admin tables to prevent fetching all records at once.
+
+2. Advanced Excel Bulk Upload (Admin UI):
+- REMOVE the `ruleId` column requirement from the Excel file. 
+- Flow: The Admin selects a "Grammar Rule" from a dropdown menu FIRST, then uploads the Excel/CSV file.
+- Create a "Staging/Preview UI": After uploading, DO NOT save to the database immediately. Display a professional table previewing the parsed questions.
+- In this preview, highlight any formatting errors. Allow the Admin to edit the cells directly in the browser. 
+- Add a final "Confirm & Upload" button.
+
+3. Professional Question Management Screen (Admin):
+- Add a dropdown filter: Admin selects a Grammar Rule, and the table ONLY displays questions for that specific rule.
+- Add "Select" and "Select All" checkboxes to allow bulk deletion or bulk actions.
+- Improve the table UI to look highly professional (Tailwind CSS, hover effects).
+
+4. Reporting & Exports:
+- Add a robust "Export Report" feature. Allow the Admin to export weakness reports and student performance data as Excel/CSV or PDF files.
+
+5. Student Progression & Mastery Learning (Quiz Engine):
+- A Level contains multiple Grammar Rules. Each Rule has its own Question Bank.
+- Admin sets `questionsPerExam` and a `passingScore`.
+- New students ONLY have "Level 1" unlocked.
+- UNLOCK CONDITION: A student MUST "Pass" all rule exams within their current Level to automatically unlock the next Level.
+
+6. Anti-Farming XP Logic (Practice Points System):
+- If `newScore` > `highestScore`: Calculate the difference (`newScore` - `highestScore`). Add ONLY this difference to the user's `totalXP`. Update `highestScore`.
+- If `newScore` == 100% AND they already had a `highestScore` of 100%: Award a symbolic "Practice Bonus" of +1 XP to `totalXP` to encourage revision.
+- Otherwise: Add 0 points. Do not update `highestScore`.
+
+7. Gamification & Perfect Score Badge:
+- If a student scores 100% on a rule's exam, award a "Perfect Score Badge" (وسام القاعدة). Display this badge clearly.
+
+8. Visual Progression Journey (CREATIVE UI):
+- Replace the standard dashboard list with an interactive, gamified "Journey Map" or "Skill Tree" (Node-based timeline) representing the student's path through the Levels.
+- Visual States: Locked rules are grayed out with a lock icon. Active/Next rules are pulsing or highlighted. Passed rules show a checkmark (or the earned Badge).
+- Overall Mastery Bar: Add a global, beautifully animated "Mastery Progress Bar" at the top of the dashboard showing the total percentage of grammar rules mastered across the entire platform.
+
+9. UI & Layout Tweaks (Notifications):
+- Move the Notifications button/icon from the bottom of the screen to the TOP-LEFT corner of the header/navigation bar for better visibility and user experience.

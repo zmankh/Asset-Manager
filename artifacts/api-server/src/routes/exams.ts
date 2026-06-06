@@ -32,7 +32,6 @@ router.post("/start", requireAuth, async (req, res) => {
 
     if (!level.active) return res.status(400).json({ error: "Level is not active" });
 
-    // Determine which ruleId to use
     const levelRuleIds = normalizeRuleIds(level);
     if (levelRuleIds.length === 0) return res.status(400).json({ error: "No rules configured for this level" });
 
@@ -54,7 +53,6 @@ router.post("/start", requireAuth, async (req, res) => {
 
     const ref = await db.collection("quizSessions").add(sessionData);
 
-    // Update lastActiveAt for streak tracking
     if (userId) {
       await db.collection("users").doc(userId).update({ lastActiveAt: new Date().toISOString() }).catch(() => {});
     }
@@ -66,7 +64,8 @@ router.post("/start", requireAuth, async (req, res) => {
   }
 });
 
-// Submit answer
+// Submit answer — returns result for UI feedback but does NOT update user XP
+// (XP is awarded only at completion using anti-farming logic)
 router.post("/:sessionId/answer", requireAuth, async (req, res) => {
   try {
     const db = getFirestore();
@@ -77,7 +76,6 @@ router.post("/:sessionId/answer", requireAuth, async (req, res) => {
 
     const question = questionDoc.data() as any;
     const correct = question.correctAnswer === answerText;
-    const xpAwarded = correct ? 10 : 0;
 
     await db.collection("quizAnswers").add({
       sessionId: req.params.sessionId,
@@ -87,25 +85,15 @@ router.post("/:sessionId/answer", requireAuth, async (req, res) => {
       timestamp: new Date().toISOString(),
     });
 
-    if (correct && userId) {
-      const userRef = db.collection("users").doc(userId);
-      const userDoc = await userRef.get();
-      if (userDoc.exists) {
-        const u = userDoc.data() as any;
-        await userRef.update({
-          xpAnnual: (u.xpAnnual || 0) + xpAwarded,
-          xpWeekly: (u.xpWeekly || 0) + xpAwarded,
-        });
-      }
-    }
-
-    res.json({ correct, correctAnswer: question.correctAnswer, hint: correct ? null : question.hint || null, xpAwarded });
+    // Return xpAwarded = 10 for UI display only — NOT saved to DB here
+    // Actual XP is awarded at exam completion with anti-farming logic
+    res.json({ correct, correctAnswer: question.correctAnswer, hint: correct ? null : question.hint || null, xpAwarded: correct ? 10 : 0 });
   } catch (err) {
     res.status(500).json({ error: "Failed to submit answer" });
   }
 });
 
-// Complete exam — track per-rule progress, advance level only when ALL rules passed
+// Complete exam — Anti-Farming XP + per-rule progress tracking
 router.post("/:sessionId/complete", requireAuth, async (req, res) => {
   try {
     const db = getFirestore();
@@ -119,12 +107,6 @@ router.post("/:sessionId/complete", requireAuth, async (req, res) => {
     const levelRuleIds = normalizeRuleIds(level);
 
     const passed = score >= level.passingScore;
-    const xpEarned = totalCorrect * 10 + (passed ? 50 : 0);
-
-    // Update session
-    await db.collection("quizSessions").doc(req.params.sessionId).update({
-      completed: true, completedAt: new Date().toISOString(), score, xpEarned, passed,
-    });
 
     // Get rule title
     const effectiveRuleId = ruleId || level.ruleId || levelRuleIds[0];
@@ -134,43 +116,61 @@ router.post("/:sessionId/complete", requireAuth, async (req, res) => {
       if (ruleDoc.exists) ruleTitle = (ruleDoc.data() as any).title;
     }
 
-    // Update or create per-rule progress record
-    const progressQuery = await db.collection("userProgress")
-      .where("userId", "==", userId)
-      .where("levelId", "==", levelId)
-      .get();
-
-    const existingForRule = progressQuery.docs.find(d => d.data().ruleId === effectiveRuleId);
-
-    if (!existingForRule) {
-      await db.collection("userProgress").add({
-        userId, levelId, levelTitle: level.title,
-        ruleId: effectiveRuleId, ruleTitle,
-        passed, score, attempts: 1,
-        completedAt: new Date().toISOString(),
-      });
-    } else {
-      const existing = existingForRule.data() as any;
-      await existingForRule.ref.update({
-        passed: existing.passed || passed,
-        score: Math.max(existing.score || 0, score),
-        attempts: (existing.attempts || 0) + 1,
-        completedAt: new Date().toISOString(),
-      });
-    }
-
-    // Check if ALL rules in the level are now passed
+    // Get existing progress for this rule (for anti-farming XP)
     const allProgressSnap = await db.collection("userProgress")
       .where("userId", "==", userId)
       .where("levelId", "==", levelId)
       .get();
 
+    const progressDocs = allProgressSnap.docs.map(d => ({ ref: d.ref, ...d.data() as any }));
+    const existingForRule = progressDocs.find((p) => p.ruleId === effectiveRuleId);
+
+    const previousBestScore: number = existingForRule?.score ?? 0;
+    const previouslyPassed: boolean = existingForRule?.passed ?? false;
+
+    // ── Anti-Farming XP ─────────────────────────────────────────────────────
+    let xpEarned = 0;
+    if (score > previousBestScore) {
+      // Award XP proportional to improvement over personal best
+      const improvement = score - previousBestScore;
+      xpEarned = Math.round(improvement); // 1 XP per 1% improvement
+      if (passed && !previouslyPassed) {
+        xpEarned += 50; // First-time passing bonus
+      }
+    } else if (score === 100 && previousBestScore === 100) {
+      xpEarned = 1; // Practice bonus for perfect-score revisit
+    }
+    // else xpEarned = 0: no improvement, no XP
+
+    // Update session
+    await db.collection("quizSessions").doc(req.params.sessionId).update({
+      completed: true, completedAt: new Date().toISOString(), score, xpEarned, passed,
+    });
+
+    // Update or create per-rule progress record
+    if (!existingForRule) {
+      await db.collection("userProgress").add({
+        userId, levelId, levelTitle: level.title,
+        ruleId: effectiveRuleId, ruleTitle,
+        passed, score,
+        highestScore: score,
+        attempts: 1,
+        completedAt: new Date().toISOString(),
+      });
+    } else {
+      await existingForRule.ref.update({
+        passed: existingForRule.passed || passed,
+        score: Math.max(existingForRule.score || 0, score),
+        highestScore: Math.max(existingForRule.score || 0, score),
+        attempts: (existingForRule.attempts || 0) + 1,
+        completedAt: new Date().toISOString(),
+      });
+    }
+
+    // Check if ALL rules in the level are now passed
     const passedRuleIds = new Set(
-      allProgressSnap.docs
-        .filter(d => d.data().passed === true)
-        .map(d => d.data().ruleId)
+      progressDocs.filter(p => p.passed === true).map(p => p.ruleId)
     );
-    // Include the current rule if just passed
     if (passed) passedRuleIds.add(effectiveRuleId);
 
     const allRulesPassed = levelRuleIds.length > 0 && levelRuleIds.every(rid => passedRuleIds.has(rid));
@@ -178,7 +178,7 @@ router.post("/:sessionId/complete", requireAuth, async (req, res) => {
     // Award XP and advance level only when all rules passed
     let newStreak = 0;
     let nextLevelId: string | null = null;
-    if (userId) {
+    if (userId && xpEarned > 0) {
       const userRef = db.collection("users").doc(userId);
       const userDoc = await userRef.get();
       if (userDoc.exists) {
@@ -190,10 +190,7 @@ router.post("/:sessionId/complete", requireAuth, async (req, res) => {
           streak: newStreak,
         };
         if (allRulesPassed) {
-          // Find next level — sort in JS to avoid composite index
-          const nextSnap = await db.collection("levels")
-            .where("active", "==", true)
-            .get();
+          const nextSnap = await db.collection("levels").where("active", "==", true).get();
           const sorted = nextSnap.docs
             .map(d => ({ id: d.id, ...d.data() as any }))
             .filter(l => l.order > level.order)
@@ -205,12 +202,22 @@ router.post("/:sessionId/complete", requireAuth, async (req, res) => {
         }
         await userRef.update(update);
       }
+    } else if (userId) {
+      // Still update streak even with 0 XP
+      const userRef = db.collection("users").doc(userId);
+      const userDoc = await userRef.get();
+      if (userDoc.exists) {
+        const u = userDoc.data() as any;
+        newStreak = (u.streak || 0) + 1;
+        await userRef.update({ streak: newStreak });
+      }
     }
 
     // Award badge on 100% for this specific rule
     let badgeEarned = false;
     let badge = null;
-    if (score === 100 && userId && effectiveRuleId) {
+    if (score === 100 && userId && effectiveRuleId && previousBestScore < 100) {
+      // Only award badge first time they get 100%
       const badgeSnap = await db.collection("badges")
         .where("userId", "==", userId)
         .where("ruleId", "==", effectiveRuleId)
@@ -228,41 +235,27 @@ router.post("/:sessionId/complete", requireAuth, async (req, res) => {
       }
     }
 
-    // Auto-create notifications
+    // Notifications
     if (userId) {
       if (badgeEarned && badge) {
-        await createUserNotification(
-          userId,
-          "🏅 وسام جديد!",
-          `لقد حصلت على وسام "${ruleTitle}" بعد إجابة 100% صحيحة!`,
-          "badge"
-        );
+        await createUserNotification(userId, "🏅 وسام جديد!", `حصلت على وسام "${ruleTitle}" بعد إجابة 100% صحيحة!`, "badge");
       }
       if (passed && allRulesPassed) {
-        await createUserNotification(
-          userId,
-          "🎉 اجتزت المستوى!",
-          `أحسنت! أتممت جميع قواعد "${level.title}". ${nextLevelId ? "المستوى التالي جاهز لك." : ""}`,
-          "level"
-        );
+        await createUserNotification(userId, "🎉 اجتزت المستوى!", `أحسنت! أتممت جميع قواعد "${level.title}". ${nextLevelId ? "المستوى التالي جاهز لك." : ""}`, "level");
       } else if (passed) {
-        await createUserNotification(
-          userId,
-          "✅ اجتزت الامتحان!",
-          `أحسنت! اجتزت امتحان "${ruleTitle}" بنتيجة ${score}%.`,
-          "exam"
-        );
+        await createUserNotification(userId, "✅ اجتزت الامتحان!", `اجتزت امتحان "${ruleTitle}" بنتيجة ${score}%.${xpEarned > 0 ? ` +${xpEarned} نقطة.` : ""}`, "exam");
       } else {
-        await createUserNotification(
-          userId,
-          "📊 نتيجة الامتحان",
-          `حصلت على ${score}% في "${ruleTitle}". ${score >= 50 ? "استمر بالتدريب لتحسين نتيجتك!" : "راجع القاعدة وحاول مجدداً."}`,
-          "exam"
-        );
+        await createUserNotification(userId, "📊 نتيجة الامتحان", `حصلت على ${score}% في "${ruleTitle}". ${score >= 50 ? "استمر للتحسين!" : "راجع القاعدة وحاول مجدداً."}`, "exam");
       }
     }
 
-    res.json({ score, passed, xpEarned, newStreak, badgeEarned, badge: badge || undefined, nextLevelId, allRulesPassed });
+    res.json({
+      score, passed, xpEarned, newStreak,
+      badgeEarned, badge: badge || undefined,
+      nextLevelId, allRulesPassed,
+      isImprovement: score > previousBestScore,
+      previousBestScore,
+    });
   } catch (err) {
     console.error("Complete exam error:", err);
     res.status(500).json({ error: "Failed to complete exam" });
