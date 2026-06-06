@@ -1,3 +1,6 @@
 - [Platform architecture](platform-arch.md) — نحوي: React+Vite edu-platform + Express api-server + Firebase Auth/Firestore. Key quirks for queryKey and mutations.
 - [Signup Firestore fix](signup-fix.md) — Firestore setDoc after Firebase Auth must be try/catch non-fatal; onAuthStateChanged recreates missing profiles.
 - [Admin email](admin-email.md) — ADMIN_EMAIL = "a.alkhdeirat@gmail.com" hardcoded in both backend (firebase-admin.ts) and frontend (auth-context.tsx).
+- [Firestore query pattern](firestore-query-pattern.md) — Never use .orderBy() with .where() on different fields (no composite index). Always sort in JS after .get(). Add .limit(500) to all admin list queries.
+- [Anti-Farming XP design](anti-farming-xp.md) — XP only awarded at exam completion, not per-answer. Formula: (score - previousBest) * 1 XP + 50 first-pass bonus. 100%→100% revisit = +1 practice bonus.
+- [Journey Map badge logic](journey-map-badges.md) — Level shows gold medal when ALL its rules have a badge entry (ruleId match). Badges fetched via useGetUserBadges.

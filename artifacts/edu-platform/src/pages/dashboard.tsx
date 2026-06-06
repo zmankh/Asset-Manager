@@ -1,4 +1,4 @@
-import { useMemo, Fragment } from "react";
+import { useMemo, useCallback, Fragment } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { 
   useGetUser, 
@@ -25,47 +25,58 @@ import {
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 
-// ── Journey Map Component ───────────────────────────────────────────────────
+// ── Journey Map ────────────────────────────────────────────────────────────────
 
 function LevelNode({
-  level, isPassed, isCurrent, isLocked,
+  level, isPassed, isCurrent, isLocked, hasPerfectScore,
 }: {
-  level: any; isPassed: boolean; isCurrent: boolean; isLocked: boolean;
+  level: any; isPassed: boolean; isCurrent: boolean; isLocked: boolean; hasPerfectScore: boolean;
 }) {
   const [, navigate] = useLocation();
 
   return (
-    <div className="flex flex-col items-center gap-2 group">
+    <div className="flex flex-col items-center gap-2">
       <button
         onClick={() => !isLocked && navigate(`/exam/${level.id}`)}
         disabled={isLocked}
+        title={isLocked ? "مقفل" : level.title}
         className={`relative w-14 h-14 rounded-full flex items-center justify-center font-bold text-lg transition-all duration-300 shadow-md
-          ${isPassed ? "bg-green-500 text-white shadow-green-200 hover:scale-105" : ""}
-          ${isCurrent ? "bg-primary text-primary-foreground shadow-primary/40 scale-110 animate-pulse hover:scale-115" : ""}
+          ${isPassed && hasPerfectScore ? "bg-yellow-400 text-white shadow-yellow-200 hover:scale-105" : ""}
+          ${isPassed && !hasPerfectScore ? "bg-green-500 text-white shadow-green-200 hover:scale-105" : ""}
+          ${isCurrent ? "bg-primary text-primary-foreground shadow-primary/40 scale-110 hover:scale-115" : ""}
           ${isLocked ? "bg-muted text-muted-foreground cursor-not-allowed shadow-none" : ""}
         `}
       >
-        {isPassed && <CheckCircle className="w-6 h-6" />}
+        {/* Pulsing ring for current */}
+        {isCurrent && (
+          <span className="absolute -inset-1.5 rounded-full border-2 border-primary/50 animate-ping" />
+        )}
+
+        {isPassed && hasPerfectScore && <Medal className="w-6 h-6" />}
+        {isPassed && !hasPerfectScore && <CheckCircle className="w-6 h-6" />}
         {isCurrent && <PlayCircle className="w-6 h-6" />}
         {isLocked && <Lock className="w-5 h-5" />}
-        {isCurrent && (
-          <span className="absolute -inset-1 rounded-full border-2 border-primary/40 animate-ping" />
-        )}
       </button>
-      <div className="text-center max-w-[80px]">
-        <p className={`text-xs font-semibold leading-tight line-clamp-2 ${isLocked ? "text-muted-foreground" : isCurrent ? "text-primary" : "text-foreground"}`}>
+
+      <div className="text-center max-w-[84px]">
+        <p className={`text-xs font-semibold leading-tight line-clamp-2
+          ${isLocked ? "text-muted-foreground" : isCurrent ? "text-primary" : hasPerfectScore ? "text-yellow-600" : "text-foreground"}
+        `}>
           {level.title}
         </p>
-        {(level as any).rules?.length > 0 && (
+        {hasPerfectScore && isPassed && (
+          <p className="text-xs text-yellow-500 font-bold mt-0.5">100% ⭐</p>
+        )}
+        {(level as any).rules?.length > 0 && !hasPerfectScore && (
           <p className="text-xs text-muted-foreground mt-0.5">
             {(level as any).rules.length} {(level as any).rules.length === 1 ? "قاعدة" : "قواعد"}
           </p>
         )}
       </div>
+
       {isCurrent && (
-        <Button size="sm" className="text-xs h-7 px-3" onClick={() => navigate(`/exam/${level.id}`)}>
+        <Button size="sm" className="text-xs h-7 px-3 shadow-sm" onClick={() => navigate(`/exam/${level.id}`)}>
           ابدأ
         </Button>
       )}
@@ -73,16 +84,32 @@ function LevelNode({
   );
 }
 
-function JourneyMap({ levels, currentLevelId }: { levels: any[]; currentLevelId: string | null }) {
+function JourneyMap({
+  levels, currentLevelId, badges,
+}: {
+  levels: any[]; currentLevelId: string | null; badges: any[];
+}) {
   const currentLevel = levels.find(l => l.id === currentLevelId);
   const currentOrder = currentLevel?.order ?? 1;
   const passedCount = levels.filter(l => l.order < currentOrder).length;
   const masteryPercent = levels.length > 0 ? Math.round((passedCount / levels.length) * 100) : 0;
 
+  // Build a Set of ruleIds that have a perfect-score badge
+  const perfectRuleIds = useMemo(() => new Set(badges.map(b => b.ruleId)), [badges]);
+
+  // A level has a perfect score if ALL its rules have a badge
+  const levelHasPerfect = useCallback(
+    (level: any): boolean => {
+      const rules: any[] = level.rules || [];
+      return rules.length > 0 && rules.every((r: any) => perfectRuleIds.has(r.id));
+    },
+    [perfectRuleIds]
+  );
+
   return (
     <div className="space-y-4">
-      {/* Mastery Bar */}
-      <div className="bg-gradient-to-l from-primary/5 to-primary/10 border border-primary/15 rounded-2xl p-4">
+      {/* Global Mastery Bar */}
+      <div className="bg-gradient-to-l from-primary/5 to-primary/15 border border-primary/15 rounded-2xl p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Star className="w-5 h-5 text-primary" />
@@ -93,12 +120,13 @@ function JourneyMap({ levels, currentLevelId }: { levels: any[]; currentLevelId:
         <Progress value={masteryPercent} className="h-3" />
         <p className="text-xs text-muted-foreground mt-1.5">
           أتقنت {passedCount} من {levels.length} مستوى
+          {badges.length > 0 && ` · ${badges.length} وسام مكتسب 🏅`}
         </p>
       </div>
 
       {/* Journey path */}
       <Card className="overflow-hidden">
-        <CardHeader className="pb-2">
+        <CardHeader className="pb-2 pt-4">
           <CardTitle className="text-base flex items-center gap-2">
             <Zap className="w-4 h-4 text-primary" />
             خريطة رحلتك
@@ -111,12 +139,21 @@ function JourneyMap({ levels, currentLevelId }: { levels: any[]; currentLevelId:
                 const isPassed = level.order < currentOrder;
                 const isCurrent = level.id === currentLevelId;
                 const isLocked = !isPassed && !isCurrent;
+                const hasPerfect = isPassed && levelHasPerfect(level);
                 return (
                   <Fragment key={level.id}>
                     {idx > 0 && (
-                      <div className={`h-0.5 w-10 self-center mb-10 transition-colors ${isPassed ? "bg-green-400" : "bg-muted"}`} />
+                      <div className={`h-0.5 w-10 self-center mb-12 transition-colors
+                        ${isPassed && levelHasPerfect(level) ? "bg-yellow-400" : isPassed ? "bg-green-400" : "bg-muted"}
+                      `} />
                     )}
-                    <LevelNode level={level} isPassed={isPassed} isCurrent={isCurrent} isLocked={isLocked} />
+                    <LevelNode
+                      level={level}
+                      isPassed={isPassed}
+                      isCurrent={isCurrent}
+                      isLocked={isLocked}
+                      hasPerfectScore={hasPerfect}
+                    />
                   </Fragment>
                 );
               })}
@@ -131,11 +168,11 @@ function JourneyMap({ levels, currentLevelId }: { levels: any[]; currentLevelId:
   );
 }
 
-// ── Dashboard ───────────────────────────────────────────────────────────────
+// ── Dashboard ─────────────────────────────────────────────────────────────────
 
 export default function StudentDashboard() {
   const { user } = useAuth();
-  
+
   const { data: userData, isLoading: isUserLoading, isError: isUserError } = useGetUser(user?.uid || "", {
     query: { enabled: !!user?.uid, queryKey: getGetUserQueryKey(user?.uid || ""), retry: 1 }
   });
@@ -146,7 +183,8 @@ export default function StudentDashboard() {
   const { data: badges } = useGetUserBadges(user?.uid || "", {
     query: { enabled: !!user?.uid, queryKey: getGetUserBadgesQueryKey(user?.uid || "") }
   });
-  const latestBadges = useMemo(() => badges?.slice(0, 4) || [], [badges]);
+  const allBadges = badges || [];
+  const latestBadges = useMemo(() => allBadges.slice(0, 4), [allBadges]);
 
   const { data: infoCards } = useListInfoCards();
   const activeInfoCards = useMemo(
@@ -156,7 +194,6 @@ export default function StudentDashboard() {
 
   const gradeCategory = (userData?.gradeCategory || null) as GradeCategory | null;
 
-  // Fetch ALL levels for student's grade category (powers the journey map)
   const { data: allLevels } = useListLevels(
     gradeCategory ? { category: gradeCategory } : undefined,
     { query: { enabled: !!gradeCategory, queryKey: getListLevelsQueryKey() } }
@@ -167,18 +204,13 @@ export default function StudentDashboard() {
     [allLevels]
   );
 
-  // Determine current level (from user data, or first active level)
   const currentLevelId = useMemo(() => {
     if (userData?.currentLevelId) return userData.currentLevelId as string;
     return sortedLevels[0]?.id ?? null;
   }, [userData?.currentLevelId, sortedLevels]);
 
-  const { data: annualLeaderboard } = useGetAnnualLeaderboard({
-    query: { queryKey: getGetAnnualLeaderboardQueryKey() }
-  });
-  const { data: weeklyLeaderboard } = useGetWeeklyLeaderboard({
-    query: { queryKey: getGetWeeklyLeaderboardQueryKey() }
-  });
+  const { data: annualLeaderboard } = useGetAnnualLeaderboard({ query: { queryKey: getGetAnnualLeaderboardQueryKey() } });
+  const { data: weeklyLeaderboard } = useGetWeeklyLeaderboard({ query: { queryKey: getGetWeeklyLeaderboardQueryKey() } });
 
   const getNotificationIcon = (type?: string) => {
     switch (type) {
@@ -193,7 +225,7 @@ export default function StudentDashboard() {
     return (
       <div className="space-y-6 pb-10 max-w-5xl mx-auto animate-pulse">
         <div className="h-24 bg-muted rounded-2xl" />
-        <div className="h-48 bg-muted rounded-2xl" />
+        <div className="h-52 bg-muted rounded-2xl" />
         <div className="grid grid-cols-3 gap-6">
           <div className="col-span-2 h-40 bg-muted rounded-2xl" />
           <div className="h-40 bg-muted rounded-2xl" />
@@ -226,7 +258,7 @@ export default function StudentDashboard() {
         </div>
       </div>
 
-      {/* Notifications */}
+      {/* Active notifications */}
       {activeNotifications.length > 0 && (
         <div className="space-y-3">
           {activeNotifications.map(notification => (
@@ -245,11 +277,11 @@ export default function StudentDashboard() {
 
       {/* Journey Map */}
       {gradeCategory ? (
-        <JourneyMap levels={sortedLevels} currentLevelId={currentLevelId} />
+        <JourneyMap levels={sortedLevels} currentLevelId={currentLevelId} badges={allBadges} />
       ) : (
         <Card className="text-center py-10 border-dashed">
           <CardContent>
-            <p className="text-muted-foreground">لم يتم تعيين فئة دراسية بعد. يرجى مراجعة الإدارة.</p>
+            <p className="text-muted-foreground">لم يتم تعيين فئة دراسية. يرجى مراجعة الإدارة.</p>
           </CardContent>
         </Card>
       )}

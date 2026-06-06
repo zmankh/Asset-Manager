@@ -30,6 +30,16 @@ export function MainLayout({ children }: MainLayoutProps) {
       </Sheet>
 
       <main className="flex-1 flex flex-col min-h-screen overflow-y-auto">
+        {/* Desktop header — notification bell top-left */}
+        {!isAdmin && (
+          <div className="hidden md:flex sticky top-0 z-40 items-center justify-start px-6 h-12 bg-background/95 backdrop-blur border-b border-border/60">
+            <div className="flex items-center gap-2">
+              <NotificationBell />
+              <span className="text-xs text-muted-foreground">الإشعارات</span>
+            </div>
+          </div>
+        )}
+
         {/* Mobile header */}
         <div className="md:hidden sticky top-0 z-40 flex items-center justify-between px-4 h-14 bg-background/95 backdrop-blur border-b border-border">
           <Button variant="ghost" size="icon" onClick={() => setMobileOpen(true)}>

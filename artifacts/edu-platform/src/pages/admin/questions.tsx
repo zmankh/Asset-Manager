@@ -51,6 +51,8 @@ export default function AdminQuestions() {
   const { data: questions, isLoading } = useListQuestions({ ruleId: selectedRuleId === "all" ? undefined : selectedRuleId });
   
   const [searchTerm, setSearchTerm] = useState("");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -80,8 +82,15 @@ export default function AdminQuestions() {
     q.questionText.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
+  const totalPages = Math.ceil(filteredQuestions.length / PAGE_SIZE);
+  const pagedQuestions = filteredQuestions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   // ── Bulk select ────────────────────────────────────────────────────────────
-  const allSelected = filteredQuestions.length > 0 && filteredQuestions.every(q => selectedIds.has(q.id));
+  // Reset page on filter change
+  const handleRuleChange = (v: string) => { setSelectedRuleId(v); setSelectedIds(new Set()); setPage(1); };
+  const handleSearchChange = (v: string) => { setSearchTerm(v); setPage(1); };
+
+  const allSelected = pagedQuestions.length > 0 && pagedQuestions.every(q => selectedIds.has(q.id));
   const someSelected = selectedIds.size > 0;
 
   const toggleSelect = (id: string) => {
@@ -96,7 +105,7 @@ export default function AdminQuestions() {
     if (allSelected) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredQuestions.map(q => q.id)));
+      setSelectedIds(new Set(pagedQuestions.map(q => q.id)));
     }
   };
 
@@ -300,7 +309,7 @@ export default function AdminQuestions() {
           <div className="flex items-center gap-4 flex-wrap justify-between">
             <div className="flex items-center gap-3 flex-wrap">
               <div className="w-64">
-                <Select value={selectedRuleId} onValueChange={(v) => { setSelectedRuleId(v); setSelectedIds(new Set()); }}>
+                <Select value={selectedRuleId} onValueChange={handleRuleChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="تصفية حسب القاعدة" />
                   </SelectTrigger>
@@ -312,7 +321,7 @@ export default function AdminQuestions() {
               </div>
               <div className="relative flex-1 min-w-[180px]">
                 <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input placeholder="ابحث في الأسئلة..." className="pr-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                <Input placeholder="ابحث في الأسئلة..." className="pr-9" value={searchTerm} onChange={e => handleSearchChange(e.target.value)} />
               </div>
             </div>
             {someSelected && (
@@ -344,14 +353,14 @@ export default function AdminQuestions() {
                     </TableCell>
                   </TableRow>
                 ))
-              ) : filteredQuestions.length === 0 ? (
+              ) : pagedQuestions.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center py-12 text-muted-foreground">
                     لا توجد أسئلة
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredQuestions.map(q => (
+                pagedQuestions.map(q => (
                   <TableRow
                     key={q.id}
                     className={`hover:bg-muted/50 transition-colors ${selectedIds.has(q.id) ? "bg-primary/5" : ""}`}
@@ -392,9 +401,24 @@ export default function AdminQuestions() {
             </TableBody>
           </Table>
           {filteredQuestions.length > 0 && (
-            <div className="px-4 py-3 border-t bg-muted/20 text-sm text-muted-foreground flex justify-between">
-              <span>{filteredQuestions.length} سؤال</span>
-              {someSelected && <span>{selectedIds.size} محدد</span>}
+            <div className="px-4 py-3 border-t bg-muted/20 flex items-center justify-between gap-4 flex-wrap">
+              <span className="text-sm text-muted-foreground">
+                {filteredQuestions.length} سؤال إجمالاً
+                {someSelected && ` · ${selectedIds.size} محدد`}
+              </span>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
+                    السابق
+                  </Button>
+                  <span className="text-sm text-muted-foreground px-2">
+                    {page} / {totalPages}
+                  </span>
+                  <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
+                    التالي
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

@@ -11,8 +11,14 @@ router.get("/", requireAuth, async (req, res) => {
     if (req.query.ruleId) {
       query = query.where("ruleId", "==", req.query.ruleId as string);
     }
-    const snap = await query.orderBy("createdAt", "desc").get();
-    const questions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    // CRITICAL: Never use .orderBy() with .where() on different fields — no composite index.
+    // Sort in JS instead after fetching.
+    const snap = await query.limit(500).get();
+    const questions = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a: any, b: any) =>
+        new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime()
+      );
     res.json(questions);
   } catch (err) {
     res.status(500).json({ error: "Failed to list questions" });
